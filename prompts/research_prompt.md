@@ -38,51 +38,76 @@ Verwende von hier an NUR noch diese drei Werte.
 - Notiere: "Vergleichsbasis: <gefundener_dateiname> (Inhalt übernommen, Datum ignoriert)"
 
 ## Schritt 2: Suche durchführen
-Führe MINDESTENS folgende 8 Suchen aus — bewusst Mix aus SAP-eigenen und
-unabhängigen Quellen:
 
-1. `SAP S/4HANA release` (offen)
-2. `SAP Cloud ERP announcement` (offen)
-3. `SAP quarterly results` (Wirtschaftspresse erwartet)
-4. `SAP logistics SCM news` (offen)
-5. `news.sap.com latest` (SAP-eigene Pressestelle)
-6. `SAP analyst report site:erp.today OR site:sapinsider.org` (Fachpresse)
-7. `SAP migration challenges OR S/4HANA implementation problems` (kritische Sicht)
-8. `SAP Handelsblatt OR FAZ OR Bloomberg` (deutsche/internationale Wirtschaftspresse)
+Themen- UND quellenorientierte Suchen. Mindestens diese 8:
+
+**Primärer Themenfokus (SD / Order-to-Cash):**
+1. `SAP Sales Distribution SD news` (offen)
+2. `S/4HANA Order-to-Cash OR pricing OR ATP` (offen)
+3. `SAP Fiori SD apps update` (offen)
+4. `SAP BTP CPI SD integration` (offen)
+
+**Sekundärer Themenfokus (Cloud, AI, Integration, Plattform):**
+5. `SAP Cloud BTP Joule news` (SAP-Quellen erwartet)
+6. `SAP AI agents OR Joule Studio` (SAP-Quellen erwartet)
+
+**SAP-eigene Pressestelle und SAP-nahe Fachpresse:**
+7. `news.sap.com latest` (SAP News Center)
+8. `SAP site:blogs.sap.com OR site:community.sap.com OR site:sapinsider.org` (SAP-nahe Quellen)
 
 Erwartete Rohtrefferzahl: 40–80 Treffer. Wenn weniger als 30, weitere Suchen
-(`SAP BTP`, `SAP Joule AI`, `SAP Datasphere`, `SAP customer story heise OR golem`).
+(`SAP Event Mesh`, `SAP Datasphere`, `S/4HANA Cloud SD Fiori update`).
 
 ## Schritt 3: Roh-Inventur
 Erstelle eine interne Tabelle ALLER gefundenen Treffer mit Titel, URL, Datum (falls genannt),
 Quelle (Domain). Zähle: Anzahl Roh-Treffer = N.
 
-## Schritt 3b: Quellen-Mix (PFLICHT)
+## Schritt 3b: Quellenpriorität (PFLICHT)
 
-In der finalen Ausgabe MÜSSEN unterschiedliche Quellen vertreten sein.
-Harte Regel: **höchstens 50 % der Items dürfen von `news.sap.com` oder
-`sap.com` stammen.** Suche aktiv unabhängige Drittquellen:
+Bei der Auswahl der finalen Items bevorzuge Quellen in dieser Reihenfolge:
 
-- ERP-Fachpresse: `erp.today`, `sapinsider.org`, `sapusers.org`, `computerweekly.com`
-- Wirtschaftspresse: Handelsblatt, FAZ, Bloomberg, Reuters
-- Tech-Journalismus: `heise.de`, `golem.de`, `t3n.de`, `silicon.de`, `theregister.com`, `siliconangle.com`
-- Analystenhäuser: Gartner, Forrester, Constellation Research
+**Priorität 1 — SAP offizielle Quellen:**
+- `news.sap.com` (SAP News Center)
+- `blogs.sap.com` (SAP Blogs)
+- `community.sap.com` (SAP Community)
+- `sap.com` (Produktseiten, Whitepapers)
 
-Falls das 50%-Limit nicht erreichbar ist (z. B. weil reine PR-Woche), lieber
-weniger Items ausgeben als überproportional viele SAP-eigene Quellen. Vermerk
-dazu in der Statistik am Ende: "Quellen-Mix: X SAP-eigene, Y unabhängige."
+**Priorität 2 — SAP-nahe Analysten- und Fachquellen:**
+- `sapinsider.org`
+- etablierte Enterprise-IT-Blogs mit SAP-Spezialisierung
 
-## Schritt 4: Themen-Filter
-Behalten:
-- Neue Releases & Produktankündigungen
-- Neue Funktionalitäten / Features
-- SAP Cloud (Public/Private), Cloud ERP, S/4HANA
-- Logistik / SCM / TM / EWM
-- Umsatzzahlen, Quartalsberichte, Geschäftserfolge, strategische Partnerschaften
-Ausschließen:
+**Priorität 3 — Sonstige technische Quellen NUR wenn SAP-bezogen:**
+- `erp.today`, `computerweekly.com`, `heise.de`, `siliconangle.com` etc.
+- Aufnahme nur, wenn der Artikel substantielle SAP-spezifische Information liefert
+  (nicht: allgemeine Tech-News, in denen SAP nur kurz erwähnt wird)
+
+## Schritt 4: Themen-Filter (mit Themen-Priorität)
+
+**Primärer Themenfokus (SEHR WICHTIG — bevorzugt aufnehmen):**
+- SAP Sales & Distribution (SD)
+- Order-to-Cash Prozesse
+- Pricing / Konditionen / ATP (Available-to-Promise)
+- S/4HANA SD Funktionen
+- Fiori SD Apps
+- Integration SD mit BTP / CPI
+
+**Sekundärer Themenfokus (wichtig):**
+- SAP Cloud (BTP, S/4HANA Cloud)
+- SAP AI / Joule / AI Agents
+- Integration (API, CPI, Event Mesh)
+- SAP Platform Updates
+
+**Tertiär (nur wenn sehr relevant):**
+- Umsatzzahlen, Quartalsberichte, strategische Partnerschaften
+- Generelle SAP-Produktankündigungen außerhalb der oben genannten Bereiche
+
+**Ausschließen:**
+- Themen ohne klare SD- oder Plattform-Relevanz
 - reine Meinungsartikel, Marketing-Blogposts ohne News-Wert
 - ältere News, die nur neu indexiert wurden
 - Treffer ohne verifizierbares Datum innerhalb der letzten 7 Tage
+
+Reihenfolge in der Ausgabe: Primäre Items oben, sekundäre danach, tertiäre zuletzt.
 
 ## Schritt 5: Validierung — DATUM IST K.O.-KRITERIUM
 
@@ -146,4 +171,8 @@ Der Speichern-Schritt wird vom Python-Wrapper übernommen.
 Gib einfach das vollständige Markdown als deine finale Antwort aus.
 
 ## Kontext
-Die Nutzerin ist SAP-Beraterin und nutzt diese Übersicht zur wöchentlichen Marktbeobachtung.
+Die Nutzerin ist **SAP-SD-Beraterin** (Sales & Distribution, Order-to-Cash) und
+nutzt diese Übersicht zur wöchentlichen Marktbeobachtung. Sie braucht
+**fachliche Tiefe in ihren Kernthemen** (SD, Pricing, ATP, Fiori SD, BTP/CPI)
+und einen breiten Blick auf SAPs Cloud-, AI- und Plattformstrategie. Kritische
+Migrationskommentare oder Konkurrenzanalysen sind explizit NICHT der Fokus.
