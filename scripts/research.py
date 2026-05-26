@@ -16,9 +16,9 @@ ROOT = Path(__file__).resolve().parent.parent
 PROMPT_FILE = ROOT / "prompts" / "research_prompt.md"
 MARKDOWN_DIR = ROOT / "data" / "markdown"
 
-MODEL = "claude-sonnet-4-6"
-MAX_TOKENS = 16000
-MAX_TOOL_USES = 40
+MODEL = "claude-haiku-4-5"
+MAX_TOKENS = 8000
+MAX_TOOL_USES = 12
 
 
 def _berlin_now() -> datetime:
