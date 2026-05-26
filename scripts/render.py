@@ -25,16 +25,16 @@ WEEKDAYS_DE = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samst
 DATE_RE = re.compile(r"^sap_news_(\d{4}-\d{2}-\d{2})\.md$")
 INDEX_LIMIT = 30
 SITE_TITLE = "SAP Newsagent"
-INTRO_HEADLINE = "Die wichtigsten SAP-News des Tages."
+INTRO_HEADLINE = "Die wichtigsten SAP-News der Woche."
 INTRO_SUBLINE = (
-    "Ein KI-Agent recherchiert jeden Morgen automatisch das Web, validiert die "
-    "Quellen und fasst die Meldungen der letzten 24 Stunden für SAP-Beraterinnen "
+    "Ein KI-Agent recherchiert jeden Montagmorgen automatisch das Web, validiert die "
+    "Quellen und fasst die Meldungen der letzten 7 Tage für SAP-Beraterinnen "
     "und SAP-Berater zusammen."
 )
 HOW_STEPS = [
     (
-        "Täglich um 8 Uhr",
-        "Eine neue Ausgabe wird automatisch erstellt — kein manuelles Anstoßen nötig.",
+        "Montags um 8 Uhr",
+        "Eine neue Wochenausgabe wird automatisch erstellt — kein manuelles Anstoßen nötig.",
     ),
     (
         "Web-Recherche & Validierung",
@@ -46,8 +46,8 @@ HOW_STEPS = [
     ),
 ]
 USAGE_NOTE = (
-    "Klicke auf eine Ausgabe, um die Meldungen des jeweiligen Tages zu lesen. "
-    "Innerhalb einer Ausgabe kannst du per Pfeil-Links bequem zum Vor- oder Folgetag wechseln."
+    "Klicke auf eine Ausgabe, um die Meldungen der jeweiligen Woche zu lesen. "
+    "Innerhalb einer Ausgabe kannst du per Pfeil-Links zur Vor- oder Folgewoche wechseln."
 )
 
 
@@ -154,7 +154,7 @@ def _render_day_page(date_iso: str, all_dates: list[str], is_latest: bool) -> Pa
   <article class="edition">
     <header class="edition-header">
       {latest_badge}
-      <p class="edition-kicker">SAP-News der letzten 24 Stunden</p>
+      <p class="edition-kicker">SAP-News der letzten 7 Tage</p>
       <h1 class="edition-date">{html.escape(date_pretty)}</h1>
       <p class="edition-meta">{item_count} {"Meldung" if item_count == 1 else "Meldungen"}</p>
     </header>

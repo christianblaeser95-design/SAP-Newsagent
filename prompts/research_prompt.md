@@ -1,4 +1,4 @@
-# Prompt: Tägliche SAP-News-Recherche (mit Deduplizierung)
+# Prompt: Wöchentliche SAP-News-Recherche (mit Deduplizierung)
 
 ## Ausgaberegel (HARTE REGEL — ÜBER ALLEM)
 Die Schritte 0–6 sind **interne Arbeitsschritte**. Führe sie still aus.
@@ -26,14 +26,13 @@ VERBOTEN als Datumsquelle:
 
 Gib das ermittelte Datum sofort aus:
 - HEUTE = YYYY-MM-DD (Quelle: <Tool/User-Angabe>)
-- GESTERN = HEUTE minus 1 Tag = YYYY-MM-DD
+- VOR_7_TAGEN = HEUTE minus 7 Tage = YYYY-MM-DD
 - JETZT = YYYY-MM-DD HH:MM Europe/Berlin
 
 Verwende von hier an NUR noch diese drei Werte.
 
 ## Schritt 1: Vorherige Datei einlesen (Inhalt OK, Datum IGNORIEREN)
-- Versuche, die Datei `sap_news_<GESTERN>.md` zu lesen.
-- Falls nicht vorhanden, suche zusätzlich die neueste vorhandene `sap_news_*.md`-Datei als Fallback.
+- Suche die neueste vorhandene `sap_news_*.md`-Datei (= letzte wöchentliche Ausgabe).
 - Aus der gefundenen Datei extrahierst du AUSSCHLIESSLICH: Titel + URLs für die Deduplizierungsliste.
 - IGNORIERE alle Datumsangaben in der Datei.
 - Notiere: "Vergleichsbasis: <gefundener_dateiname> (Inhalt übernommen, Datum ignoriert)"
@@ -65,12 +64,12 @@ Behalten:
 Ausschließen:
 - reine Meinungsartikel, Marketing-Blogposts ohne News-Wert
 - ältere News, die nur neu indexiert wurden
-- Treffer ohne verifizierbares Datum innerhalb der letzten 24 h
+- Treffer ohne verifizierbares Datum innerhalb der letzten 7 Tage
 
 ## Schritt 5: Validierung (PFLICHT)
 Für JEDEN verbleibenden Treffer:
 1. URL per web_fetch aufrufen.
-2. Datum verifizieren (letzte 24 h, Referenz JETZT).
+2. Datum verifizieren (letzte 7 Tage, Referenz JETZT).
 3. Titel und Inhalt verifizieren.
 4. Bei Abweichung → ausschließen.
 
@@ -84,7 +83,7 @@ Mehrfachberichterstattung auf EINE Meldung reduzieren — bevorzugt Primärquell
 ## Schritt 7: Ausgabe (Deutsch)
 Beginne mit:
 - "Stand: <JETZT> Europe/Berlin"
-- "Zeitfenster: letzte 24 Stunden"
+- "Zeitfenster: letzte 7 Tage"
 - "Vergleichsbasis: <Dateiname> (gefunden / nicht gefunden)"
 
 Pro News-Item:
@@ -107,4 +106,4 @@ Der Speichern-Schritt wird vom Python-Wrapper übernommen.
 Gib einfach das vollständige Markdown als deine finale Antwort aus.
 
 ## Kontext
-Die Nutzerin ist SAP-Beraterin und nutzt diese Übersicht zur täglichen Marktbeobachtung.
+Die Nutzerin ist SAP-Beraterin und nutzt diese Übersicht zur wöchentlichen Marktbeobachtung.

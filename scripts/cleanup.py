@@ -12,7 +12,8 @@ ROOT = Path(__file__).resolve().parent.parent
 MARKDOWN_DIR = ROOT / "data" / "markdown"
 ARCHIVE_DIR = ROOT / "docs" / "archive"
 
-RETENTION_DAYS = 30
+# 90 Tage ≈ 12 wöchentliche Ausgaben — sinnvoller Archivumfang bei Wochentakt.
+RETENTION_DAYS = 90
 MD_RE = re.compile(r"^sap_news_(\d{4}-\d{2}-\d{2})\.md$")
 HTML_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})\.html$")
 

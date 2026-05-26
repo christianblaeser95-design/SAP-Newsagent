@@ -1,8 +1,9 @@
-name: Daily SAP News
+name: Weekly SAP News
 
 on:
   schedule:
-    - cron: "0 6 * * *"
+    # Montag 06:00 UTC = 07:00 Berlin (Winter) / 08:00 Berlin (Sommer)
+    - cron: "0 6 * * 1"
   workflow_dispatch:
 
 permissions:
@@ -33,5 +34,5 @@ jobs:
       - name: Commit & push changes
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: "chore: SAP news update ${{ github.run_started_at }}"
+          commit_message: "chore: weekly SAP news update ${{ github.run_started_at }}"
           file_pattern: "data/markdown/* docs/index.html docs/archive/*"
