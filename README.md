@@ -1,92 +1,174 @@
 # SAP-Newsagent
 
-Automatisierte tägliche SAP-News-Übersicht. Ein GitHub-Actions-Workflow ruft einmal pro Tag
-die Anthropic API (Claude mit `web_search` + `web_fetch`) auf, recherchiert neue SAP-News
-der letzten 24 Stunden, dedupliziert gegen den Vortag, rendert das Ergebnis als HTML und
-veröffentlicht es über **GitHub Pages**.
+Automatisierte **wöchentliche SAP-News-Übersicht** für SAP-SD-Beraterinnen und -Berater.
+
+Ein GitHub-Actions-Workflow ruft jeden Montagmorgen die Anthropic API (Claude mit
+`web_search` + `web_fetch`) auf, recherchiert SAP-News der letzten 7 Tage,
+extrahiert sie als strukturierte Items in eine JSONL-Datenbank, dedupliziert
+gegen alle bisherigen Einträge, rendert das Ergebnis als HTML und veröffentlicht
+es über **GitHub Pages**.
+
+Live: https://christianblaeser95-design.github.io/SAP-Newsagent/
+
+## Architektur in 30 Sekunden
+
+```
+   ┌── Workflow (Mo 06:00 UTC) ────────────────┐
+   │                                            │
+   │  research.py  ──Claude API+web_search──>  Markdown-Antwort
+   │     │                                      │
+   │     └── parse.py: Items extrahieren ──>   data/news.jsonl
+   │                                            │      (Source of Truth)
+   │                                            ▼
+   │  render.py ── liest JSONL, filtert ──> docs/archive/*.html
+   │              pro Wochenausgabe              docs/index.html
+   │                                            │
+   └────────────────────────────────────────────┘
+                                                │
+                                                ▼
+                              git commit + push → GitHub Pages
+```
+
+**Schlüsselidee:** `data/news.jsonl` ist die persistente Datenbank aller jemals
+gefetchten Items. Jede Wochenausgabe ist nur ein **Datumsfilter** (`published_date`
+in den 7 Tagen vor dem Edition-Datum) über diese DB. Neue Läufe legen Items hinzu
+(URL-Dedup), löschen nie. So sind auch **rückwirkende Wochenausgaben** möglich,
+sobald genug Daten in der DB sind.
 
 ## Projektstruktur
 
 ```
-.github/workflows/daily-news.yml   # Cron 06:00 UTC + workflow_dispatch
+.github/workflows/daily-news.yml   # Cron Mo 06:00 UTC + workflow_dispatch
 docs/                              # GitHub Pages Root
-  index.html                       # Übersicht der letzten 30 Tage (generiert)
+  index.html                       # Startseite (generiert)
   style.css
-  archive/YYYY-MM-DD.html          # Eine Seite pro Tag (generiert)
-data/markdown/sap_news_*.md        # Roh-Markdown der Recherchen
+  archive/YYYY-MM-DD.html          # Pro Wochenausgabe eine Seite (generiert)
+data/
+  news.jsonl                       # Persistente Item-Datenbank (Source of Truth)
+  markdown/sap_news_*.md           # Roh-Antworten des Modells (Audit-Trail)
 prompts/research_prompt.md         # Recherche-Prompt (frei anpassbar)
 scripts/
-  research.py                      # Anthropic API + Tools
-  render.py                        # Markdown → HTML + Index
-  cleanup.py                       # Löscht Einträge > 30 Tage
-  main.py                          # Orchestrierung
+  main.py                          # Orchestrierung: research → render → cleanup
+  research.py                      # Anthropic API + Datums-Post-Filter + JSONL-Append
+  parse.py                         # Markdown → strukturierte Items
+  database.py                      # JSONL-Lesen/Schreiben (Dedup nach URL)
+  render.py                        # JSONL → HTML (Editionen + Index)
+  cleanup.py                       # Löscht alte HTML-/Markdown-Dateien (>90 Tage)
+  import_markdown.py               # Einmaliger Import bestehender Markdowns in DB
+  seed_may_2026.py                 # Einmaliger Seed mit Mai-2026-Recherche
 requirements.txt
 ```
+
+## Modell, Quellen, Themen
+
+- **Modell:** `claude-haiku-4-5` (kostengünstig, eigener Rate-Limit-Pool).
+  Für höhere Qualität auf `claude-sonnet-4-6` umstellen (`scripts/research.py`,
+  Konstante `MODEL`) — benötigt Anthropic-API-Tier 2.
+- **Tools:** `web_search_20260209` + `web_fetch_20260209` (GA), beide mit
+  `allowed_callers=["direct"]` (Haiku unterstützt kein Programmatic Tool Calling).
+- **Tool-Limit:** `max_uses=12` pro Tool und Lauf.
+- **Zeitfenster:** Letzte 7 Tage (`scripts/research.py`, `cutoff_date`).
+- **Themenfokus** (in `prompts/research_prompt.md` definiert):
+  - Primär: SAP SD, Order-to-Cash, Pricing, ATP, Fiori SD, BTP/CPI-Integration
+  - Sekundär: SAP Cloud (BTP, S/4HANA Cloud), AI / Joule, Integration, Plattform
+- **Quellenpriorität:**
+  1. SAP-offiziell (news.sap.com, blogs.sap.com, community.sap.com)
+  2. SAP-nahe Fachpresse (sapinsider.org)
+  3. Sonstige nur bei klarem SAP-Bezug
 
 ## Lokales Setup
 
 ```powershell
-# Virtuelle Umgebung anlegen
+# Virtuelle Umgebung
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 
-# Abhängigkeiten installieren
+# Abhängigkeiten
 pip install -r requirements.txt
 
-# API-Key setzen (für die aktuelle Shell)
+# API-Key setzen (nur für API-Lauf nötig — Render/Cleanup laufen ohne)
 $env:ANTHROPIC_API_KEY = "sk-ant-..."
 
-# Pipeline lokal ausführen
+# Vollständige Pipeline (kostet API-Tokens)
 python scripts/main.py
+
+# Nur HTML neu rendern (ohne API)
+python scripts/render.py
+
+# Nur alte Einträge aufräumen
+python scripts/cleanup.py
+
+# Bestehende Markdown-Dateien in DB importieren (einmalig)
+python scripts/import_markdown.py
 ```
 
-Das erzeugt eine neue Markdown-Datei in `data/markdown/` und aktualisiert `docs/`.
 Lokale Vorschau: `docs/index.html` im Browser öffnen.
+
+## Robustheit & Garantien
+
+- **Datums-Garantie:** Selbst wenn das Modell den 7-Tage-Cutoff ignoriert, wirft
+  der Wrapper (`research.py:_filter_by_date`) Items mit Publikationsdatum vor
+  Cutoff oder mehr als 1 Tag in der Zukunft programmatisch raus.
+- **Fail-Safe:** Bei API-Fehlern oder leerer Antwort wird **keine** Datei
+  geschrieben (Exit-Code ≠ 0), damit der Auto-Commit nichts Kaputtes pusht.
+- **URL-Dedup:** Items werden in der DB nach URL eindeutig gehalten. Erneutes
+  Auffinden eines Items aktualisiert es höchstens (Summary, Source).
+- **Aufbewahrung:** `cleanup.py` löscht Markdown-/HTML-Dateien älter als 90 Tage.
+  Die **JSONL-Datenbank wird nie automatisch gekürzt** — sie wächst kontinuierlich.
 
 ## Kosten
 
-Pro Lauf wenige US-Cent (abhängig von Anzahl Web-Suchen und web_fetch-Aufrufen).
-
-## Modell und Tools
-
-- **Modell**: `claude-sonnet-4-6` (in `scripts/research.py`, Konstante `MODEL`).
-- **Server-Tools**: `web_search_20260209`, `web_fetch_20260209` (GA-Versionen mit dynamischem
-  Filter; kein Beta-Header nötig).
-- **Tool-Limit**: `max_uses=40` pro Tool und Lauf.
+- Haiku 4.5, wöchentlich, mit `max_uses=12`: ~$0,05 pro Lauf → **~$0,20/Monat**.
+- Sonnet 4.6 (falls upgegradet): ~$0,15 pro Lauf → ~$0,60/Monat.
 
 ## GitHub-Einrichtung (einmalig)
 
-1. **Repository-Secret anlegen**: `Settings → Secrets and variables → Actions →
+1. **Repository-Secret:** `Settings → Secrets and variables → Actions →
    New repository secret`
    - Name: `ANTHROPIC_API_KEY`
-   - Wert: dein Anthropic API-Key (`sk-ant-...`)
+   - Wert: dein Anthropic-API-Key (`sk-ant-...`)
+2. **Workflow-Permissions:** `Settings → Actions → General → Workflow permissions
+   → Read and write permissions`
+3. **GitHub Pages:** `Settings → Pages → Deploy from a branch → main → /docs`
+4. **Workflow erstmalig manuell:** `Actions → Weekly SAP News → Run workflow`
 
-2. **Workflow-Permissions auf "Read and write" setzen**:
-   `Settings → Actions → General → Workflow permissions →
-   "Read and write permissions"` aktivieren.
+Danach läuft der Workflow automatisch jeden **Montag um 06:00 UTC**
+(07:00 Berlin im Winter, 08:00 Berlin im Sommer).
 
-3. **GitHub Pages aktivieren**: `Settings → Pages`
-   - Source: **Deploy from a branch**
-   - Branch: `main`, Ordner `/docs`
-   - Speichern. Die Seite ist dann unter
-     `https://<dein-user>.github.io/SAP-Newsagent/` erreichbar.
+## Anpassungen
 
-4. **Workflow erstmalig manuell starten**: `Actions → Daily SAP News → Run workflow`.
-   Der erste Lauf erzeugt `data/markdown/sap_news_<HEUTE>.md` und committet die HTML-Dateien.
+| Möchte ich… | …ändere ich… |
+|---|---|
+| anderes Modell | `scripts/research.py` → `MODEL` |
+| anderes Zeitfenster | `scripts/research.py` → `cutoff_date = today_date - timedelta(days=N)` und im Prompt `VOR_7_TAGEN`-Text |
+| anderen Themenfokus / Quellen | `prompts/research_prompt.md` |
+| anderen Zeitplan | `.github/workflows/daily-news.yml` → `cron` |
+| längere Aufbewahrung | `scripts/cleanup.py` → `RETENTION_DAYS` |
+| Site-Design | `docs/style.css` |
+| Site-Texte (Headline, "So funktioniert's") | `scripts/render.py` → Konstanten oben im File |
 
-Danach läuft der Job täglich um **06:00 UTC** automatisch.
+## Items manuell hinzufügen
 
-## Recherche-Prompt anpassen
+Items lassen sich ohne API-Aufruf in die DB einpflegen. Vorlage:
+`scripts/seed_may_2026.py`. Pattern:
 
-Der gesamte Recherche-Prompt liegt in `prompts/research_prompt.md`. Hier kannst du
-Suchanfragen, Themen-Filter oder Ausgabeformat ändern, ohne den Python-Code anzufassen.
+```python
+from database import load_items, save_items
+from parse import _stable_id, upsert_items
 
-Der Wrapper hängt automatisch die autoritativen Datumsangaben (HEUTE/GESTERN/JETZT) und
-die Vortagesdatei als Vergleichsbasis an, damit das Modell nicht selbst raten muss.
+existing = load_items()
+upsert_items(existing, [
+    {
+        "id": _stable_id(url),
+        "title": "...",
+        "summary": "...",
+        "url": "https://...",
+        "source": "news.sap.com",
+        "published_date": "2026-05-21",
+        "first_seen_run": "2026-05-26",
+    }
+])
+save_items(existing.values())
+```
 
-## Robustheit
-
-- Bei API-Fehlern oder leerer Antwort wird **keine** Markdown-Datei geschrieben (Exit-Code
-  ≠ 0), damit der Auto-Commit nichts kaputtes pusht.
-- `cleanup.py` löscht Einträge älter als 30 Tage anhand des Datums im Dateinamen.
-- Logging mit Zeitstempel via `logging`-Modul.
+Danach `python scripts/render.py` zum Neu-Rendern.
