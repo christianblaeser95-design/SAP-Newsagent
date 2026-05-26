@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SAP Newsagent – Tägliche KI-kuratierte SAP-News</title>
-<meta name="description" content="Eine automatisch erstellte, tägliche Übersicht relevanter SAP-Nachrichten der letzten 24 Stunden — kuratiert für SAP-Beraterinnen und -Berater.">
+<meta name="description" content="Ein KI-Agent recherchiert jeden Montagmorgen automatisch das Web, validiert die Quellen und fasst die Meldungen der letzten 7 Tage für SAP-Beraterinnen und SAP-Berater zusammen.">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -16,23 +16,54 @@
   <p class="site-tagline">Tägliche KI-kuratierte SAP-News</p>
 </header>
 <main class="index-page">
-  <section class="about">
-    <h1 class="about-headline">Was ist der SAP Newsagent?</h1>
-    <p class="about-lead">Eine automatisch erstellte, tägliche Übersicht relevanter SAP-Nachrichten der letzten 24 Stunden — kuratiert für SAP-Beraterinnen und -Berater.</p>
-    <p class="about-detail">Jeden Morgen recherchiert ein KI-Agent (Anthropic Claude) das Web, validiert Quellen, filtert auf SAP-Relevanz und entfernt Duplikate gegen den Vortag.</p>
+
+  <section class="intro">
+    <p class="intro-eyebrow">Für SAP-Beraterinnen und SAP-Berater</p>
+    <h1 class="intro-headline">Die wichtigsten SAP-News der Woche.</h1>
+    <p class="intro-subline">Ein KI-Agent recherchiert jeden Montagmorgen automatisch das Web, validiert die Quellen und fasst die Meldungen der letzten 7 Tage für SAP-Beraterinnen und SAP-Berater zusammen.</p>
   </section>
 
-  <section class="hero">
-  <p class="hero-kicker">Aktuelle Ausgabe · 1 Meldung</p>
-  <h2 class="hero-date">Dienstag, 26. Mai 2026</h2>
-  <p class="hero-teaser">Top-Meldung: „Statistik:“</p>
-  <a class="hero-cta" href="archive/2026-05-26.html">Ausgabe lesen →</a>
+  <section class="featured" aria-labelledby="featured-heading">
+  <div class="featured-tag">Aktuelle Ausgabe</div>
+  <h2 id="featured-heading" class="featured-date">Dienstag, 26. Mai 2026</h2>
+  <p class="featured-meta">4 Meldungen · automatisch erstellt</p>
+  <p class="featured-teaser">Top-Meldung: „**SAP Unveils the Autonomous Enterprise**“</p>
+  <a class="featured-cta" href="archive/2026-05-26.html">Ausgabe lesen →</a>
 </section>
 
-  <section class="archive">
-    <h2 class="section-title">Frühere Ausgaben</h2>
+  <section class="how" aria-labelledby="how-heading">
+    <h2 id="how-heading" class="section-title">So funktioniert's</h2>
+    <ol class="how-list">
+<li class="how-step">
+  <span class="how-num">1</span>
+  <div>
+    <h3 class="how-title">Montags um 8 Uhr</h3>
+    <p class="how-desc">Eine neue Wochenausgabe wird automatisch erstellt — kein manuelles Anstoßen nötig.</p>
+  </div>
+</li>
+<li class="how-step">
+  <span class="how-num">2</span>
+  <div>
+    <h3 class="how-title">Web-Recherche &amp; Validierung</h3>
+    <p class="how-desc">Acht thematische Suchen, jede Quelle vor Aufnahme auf Aktualität und Inhalt geprüft.</p>
+  </div>
+</li>
+<li class="how-step">
+  <span class="how-num">3</span>
+  <div>
+    <h3 class="how-title">Dedupliziert &amp; gefiltert</h3>
+    <p class="how-desc">Nur Meldungen mit konkretem News-Wert (Releases, Produkte, Zahlen, Partnerschaften).</p>
+  </div>
+</li>
+    </ol>
+    <p class="how-usage">Klicke auf eine Ausgabe, um die Meldungen der jeweiligen Woche zu lesen. Innerhalb einer Ausgabe kannst du per Pfeil-Links zur Vor- oder Folgewoche wechseln.</p>
+  </section>
+
+  <section class="archive" aria-labelledby="archive-heading">
+    <h2 id="archive-heading" class="section-title">Frühere Ausgaben</h2>
     <p class="archive-empty">Noch keine älteren Ausgaben vorhanden.</p>
   </section>
+
 </main>
 <footer class="site-footer">
   <p>Automatisch erstellt mit <a href="https://www.anthropic.com/claude" rel="noopener">Anthropic Claude</a>.
