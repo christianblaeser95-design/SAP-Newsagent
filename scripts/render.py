@@ -83,13 +83,32 @@ def _extract_first_title(markdown_text: str) -> str:
 
 
 def _count_items(markdown_text: str) -> int:
-    """Zählt die News-Items im Markdown (basiert auf **Titel**-Zeilen)."""
+    """Zählt die News-Items im Markdown (basiert auf **Titel**-Zeilen).
+
+    Schließt Label-Zeilen aus, die mit ':' enden (z.B. **Statistik:**) sowie
+    bekannte Metadaten-Labels.
+    """
+    # Bekannte Metadaten-Labels, die optisch wie News-Titel aussehen können.
+    skip_labels = {
+        "statistik", "zeitfenster", "vergleichsbasis", "stand",
+        "quelle", "datum", "relevanz für beratung", "relevanz",
+    }
     count = 0
     for line in markdown_text.splitlines():
         stripped = line.strip()
-        if re.match(r"^[-*]?\s*\*\*(.+?)\*\*\s*$", stripped):
+        m = re.match(r"^[-*]?\s*\*\*(.+?)\*\*\s*:?\s*$", stripped)
+        if m:
+            label = m.group(1).strip().rstrip(":").lower()
+            # Bold-Zeile, die mit ':' endet → fast immer ein Label, kein Titel.
+            if stripped.rstrip().endswith(":"):
+                continue
+            if label in skip_labels:
+                continue
             count += 1
         elif stripped.startswith("## ") and len(stripped) > 3:
+            heading = stripped[3:].strip().lower().rstrip(":")
+            if heading in skip_labels:
+                continue
             count += 1
     return count
 
