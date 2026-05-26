@@ -168,10 +168,25 @@ def _build_nav(date_iso: str, all_dates: list[str]) -> str:
     return "\n".join(parts)
 
 
+def _format_inline_markdown(text: str) -> str:
+    """Konvertiert Inline-Markdown zu HTML (escapet zuerst alle HTML-Sonderzeichen).
+
+    Unterstützt: **bold** → <strong>, *italic* → <em>, `code` → <code>.
+    """
+    escaped = html.escape(text)
+    # **bold** (vor *italic* anwenden, weil ** ein Subset von * ist)
+    escaped = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", escaped)
+    # *italic*
+    escaped = re.sub(r"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)", r"<em>\1</em>", escaped)
+    # `code`
+    escaped = re.sub(r"`([^`]+)`", r"<code>\1</code>", escaped)
+    return escaped
+
+
 def _render_item_html(item: dict) -> str:
     """Rendert ein einzelnes News-Item als HTML-Karte."""
     title = html.escape(item.get("title", "(ohne Titel)"))
-    summary = html.escape(item.get("summary", ""))
+    summary = _format_inline_markdown(item.get("summary", ""))
     url = item.get("url", "")
     source = item.get("source", "") or _domain_from_url(url)
     pub = item.get("published_date", "")
