@@ -173,12 +173,31 @@ Beginne mit:
 - "Zeitfenster: letzte 7 Tage"
 - "Vergleichsbasis: <Dateiname> (gefunden / nicht gefunden)"
 
-Pro News-Item:
+Pro News-Item — VERBINDLICHES Format:
 - **Titel** (deutsch)
 - Datum (verifiziert) & Quelle (Domain)
-- 2–3 Sätze: Kernaussage + Relevanz für SAP-Beratung
+- 1–2 Sätze Kernaussage (was passiert ist, worum geht es)
+- **PFLICHT:** Ein separater letzter Satz, der wörtlich mit
+  `**Relevanz für SAP-Beratung:**` beginnt und eine Beratersicht liefert:
+  Was bedeutet diese News konkret für laufende oder geplante SAP-Projekte?
+  Welche Module, Rollen, Entscheidungen sind betroffen?
 - Direkter Link (validiert) — IMMER als Markdown-Link formatieren:
   `[domain.com](https://volle-url)` (NICHT die nackte URL ausgeben)
+
+Beispiel-Item:
+
+> **SAP übernimmt Dremio**
+>
+> Datum: 2026-05-04 | Quelle: news.sap.com
+>
+> SAP hat die Übernahme von Dremio vereinbart, einer offenen
+> Data-Lakehouse-Plattform auf Basis von Apache Iceberg.
+>
+> **Relevanz für SAP-Beratung:** Beeinflusst Datenstrategie-Entscheidungen
+> bei hybriden Landschaften (SAP + Non-SAP) und macht offene Lakehouse-Formate
+> zur strategischen Option für Business Data Cloud.
+>
+> [news.sap.com](https://news.sap.com/2026/05/sap-to-acquire-dremio-...)
 
 Wenn keine neuen News: "> Du bist auf dem aktuellen Stand."
 
