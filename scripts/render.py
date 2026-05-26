@@ -1,13 +1,22 @@
-"""Konvertiert Markdown-Dateien in HTML-Tagesseiten und aktualisiert den Index."""
+"""Rendert HTML-Seiten aus der JSONL-Datenbank.
+
+Architektur:
+- `data/news.jsonl` ist die Quelle der Wahrheit für alle Items.
+- Jede `data/markdown/sap_news_YYYY-MM-DD.md` markiert ein "Edition-Datum"
+  (ein Lauf des Recherche-Workflows).
+- Pro Edition zeigt die HTML-Seite Items mit `published_date` in den 7 Tagen
+  vor dem Edition-Datum.
+- Existieren noch keine Markdown-Dateien, gibt es nur die "Heute"-Edition.
+"""
 from __future__ import annotations
 
 import html
 import logging
 import re
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
-import markdown as md
+from database import load_items
 
 logger = logging.getLogger(__name__)
 
@@ -22,8 +31,10 @@ MONTHS_DE = {
 }
 WEEKDAYS_DE = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"]
 
-DATE_RE = re.compile(r"^sap_news_(\d{4}-\d{2}-\d{2})\.md$")
+MARKDOWN_RE = re.compile(r"^sap_news_(\d{4}-\d{2}-\d{2})\.md$")
 INDEX_LIMIT = 30
+WINDOW_DAYS = 7
+
 SITE_TITLE = "SAP Newsagent"
 INTRO_HEADLINE = "Die wichtigsten SAP-News der Woche."
 INTRO_SUBLINE = (
@@ -51,66 +62,65 @@ USAGE_NOTE = (
 )
 
 
-def _format_date_de(date_iso: str, *, with_weekday: bool = False) -> str:
-    dt = datetime.strptime(date_iso, "%Y-%m-%d")
+def _format_date_de(date_iso: str | date, *, with_weekday: bool = False) -> str:
+    if isinstance(date_iso, date):
+        dt = date_iso
+    else:
+        dt = datetime.strptime(date_iso, "%Y-%m-%d").date()
     base = f"{dt.day}. {MONTHS_DE[dt.month]} {dt.year}"
     if with_weekday:
         return f"{WEEKDAYS_DE[dt.weekday()]}, {base}"
     return base
 
 
-def _collect_dates() -> list[str]:
-    if not MARKDOWN_DIR.exists():
-        return []
+def _collect_edition_dates() -> list[str]:
+    """Sammelt Edition-Daten aus den Markdown-Dateien (Recherche-Läufe).
+
+    Wenn keine vorhanden sind, gibt es eine virtuelle "Heute"-Edition.
+    """
     dates: list[str] = []
-    for path in MARKDOWN_DIR.glob("sap_news_*.md"):
-        match = DATE_RE.match(path.name)
-        if match:
-            dates.append(match.group(1))
+    if MARKDOWN_DIR.exists():
+        for path in MARKDOWN_DIR.glob("sap_news_*.md"):
+            match = MARKDOWN_RE.match(path.name)
+            if match:
+                dates.append(match.group(1))
+    if not dates:
+        dates = [date.today().isoformat()]
     return sorted(dates)
 
 
-def _extract_first_title(markdown_text: str) -> str:
-    """Extrahiert den ersten **Titel** aus dem Markdown als Teaser."""
-    for line in markdown_text.splitlines():
-        stripped = line.strip()
-        m = re.match(r"^[-*]?\s*\*\*(.+?)\*\*\s*$", stripped)
-        if m:
-            return m.group(1).strip()
-        if stripped.startswith("## ") and len(stripped) > 3:
-            return stripped[3:].strip()
-    return ""
+def _items_for_edition(items: list[dict], edition_date: str) -> list[dict]:
+    """Items, deren Publikationsdatum in den 7 Tagen VOR edition_date liegt."""
+    end_dt = datetime.strptime(edition_date, "%Y-%m-%d").date()
+    start_dt = end_dt - timedelta(days=WINDOW_DAYS)
+    result: list[dict] = []
+    for item in items:
+        try:
+            pub = datetime.strptime(item["published_date"], "%Y-%m-%d").date()
+        except (KeyError, ValueError):
+            continue
+        if start_dt <= pub <= end_dt:
+            result.append(item)
+    # Neueste zuerst
+    result.sort(key=lambda i: i.get("published_date", ""), reverse=True)
+    return result
 
 
-def _count_items(markdown_text: str) -> int:
-    """Zählt die News-Items im Markdown (basiert auf **Titel**-Zeilen).
+def _site_header(home_href: str) -> str:
+    return f"""<header class="site-header">
+  <a class="site-brand" href="{home_href}" title="Zur Startseite">
+    <span class="brand-mark">SAP</span>
+    <span class="brand-name">Newsagent</span>
+  </a>
+  <p class="site-tagline">Wöchentliche KI-kuratierte SAP-News</p>
+</header>"""
 
-    Schließt Label-Zeilen aus, die mit ':' enden (z.B. **Statistik:**) sowie
-    bekannte Metadaten-Labels.
-    """
-    # Bekannte Metadaten-Labels, die optisch wie News-Titel aussehen können.
-    skip_labels = {
-        "statistik", "zeitfenster", "vergleichsbasis", "stand",
-        "quelle", "datum", "relevanz für beratung", "relevanz",
-    }
-    count = 0
-    for line in markdown_text.splitlines():
-        stripped = line.strip()
-        m = re.match(r"^[-*]?\s*\*\*(.+?)\*\*\s*:?\s*$", stripped)
-        if m:
-            label = m.group(1).strip().rstrip(":").lower()
-            # Bold-Zeile, die mit ':' endet → fast immer ein Label, kein Titel.
-            if stripped.rstrip().endswith(":"):
-                continue
-            if label in skip_labels:
-                continue
-            count += 1
-        elif stripped.startswith("## ") and len(stripped) > 3:
-            heading = stripped[3:].strip().lower().rstrip(":")
-            if heading in skip_labels:
-                continue
-            count += 1
-    return count
+
+def _site_footer() -> str:
+    return """<footer class="site-footer">
+  <p>Automatisch erstellt mit <a href="https://www.anthropic.com/claude" rel="noopener">Anthropic Claude</a>.
+  Quellen werden vor der Aufnahme validiert; trotzdem ohne Gewähr.</p>
+</footer>"""
 
 
 def _build_nav(date_iso: str, all_dates: list[str]) -> str:
@@ -131,31 +141,61 @@ def _build_nav(date_iso: str, all_dates: list[str]) -> str:
     return "\n".join(parts)
 
 
-def _site_header(home_href: str) -> str:
-    return f"""<header class="site-header">
-  <a class="site-brand" href="{home_href}" title="Zur Startseite">
-    <span class="brand-mark">SAP</span>
-    <span class="brand-name">Newsagent</span>
-  </a>
-  <p class="site-tagline">Wöchentliche KI-kuratierte SAP-News</p>
-</header>"""
+def _render_item_html(item: dict) -> str:
+    """Rendert ein einzelnes News-Item als HTML-Karte."""
+    title = html.escape(item.get("title", "(ohne Titel)"))
+    summary = html.escape(item.get("summary", ""))
+    url = item.get("url", "")
+    source = item.get("source", "") or _domain_from_url(url)
+    pub = item.get("published_date", "")
+    pub_pretty = _format_date_de(pub) if pub else ""
+
+    meta_parts = []
+    if pub_pretty:
+        meta_parts.append(f'<time datetime="{html.escape(pub)}">{html.escape(pub_pretty)}</time>')
+    if source:
+        meta_parts.append(f'<span class="item-source">{html.escape(source)}</span>')
+    meta_html = " · ".join(meta_parts)
+
+    link_html = (
+        f'<a class="item-link" href="{html.escape(url)}" target="_blank" rel="noopener">'
+        f'Originalartikel öffnen →</a>'
+    ) if url else ""
+
+    return f"""<article class="news-item">
+  <h2 class="item-title">{title}</h2>
+  <p class="item-meta">{meta_html}</p>
+  <p class="item-summary">{summary}</p>
+  {link_html}
+</article>"""
 
 
-def _site_footer() -> str:
-    return """<footer class="site-footer">
-  <p>Automatisch erstellt mit <a href="https://www.anthropic.com/claude" rel="noopener">Anthropic Claude</a>.
-  Quellen werden vor der Aufnahme validiert; trotzdem ohne Gewähr.</p>
-</footer>"""
+def _domain_from_url(url: str) -> str:
+    match = re.match(r"https?://([^/]+)", url or "")
+    if not match:
+        return ""
+    host = match.group(1).lower()
+    return host[4:] if host.startswith("www.") else host
 
 
-def _render_day_page(date_iso: str, all_dates: list[str], is_latest: bool) -> Path:
-    md_path = MARKDOWN_DIR / f"sap_news_{date_iso}.md"
-    text = md_path.read_text(encoding="utf-8")
-    body_html = md.markdown(text, extensions=["extra", "sane_lists"])
-    nav_html = _build_nav(date_iso, all_dates)
-    date_pretty = _format_date_de(date_iso, with_weekday=True)
-    item_count = _count_items(text)
+def _render_day_page(edition_date: str, all_dates: list[str], items: list[dict], is_latest: bool) -> Path:
+    nav_html = _build_nav(edition_date, all_dates)
+    date_pretty = _format_date_de(edition_date, with_weekday=True)
+    item_count = len(items)
     latest_badge = '<span class="badge">Aktuelle Ausgabe</span>' if is_latest else ""
+
+    if items:
+        items_html = "\n".join(_render_item_html(it) for it in items)
+        body_html = items_html
+    else:
+        body_html = (
+            '<div class="empty-state">'
+            '<p class="empty-headline">Keine neuen Meldungen in diesem Zeitraum.</p>'
+            '<p class="empty-text">Der Recherche-Agent hat in den 7 Tagen vor diesem '
+            'Datum keine relevanten SAP-Meldungen gefunden, die alle Qualitätskriterien '
+            '(Aktualität, Themenfilter, Validierung) erfüllen.</p>'
+            '</div>'
+        )
 
     page = f"""<!DOCTYPE html>
 <html lang="de">
@@ -163,7 +203,7 @@ def _render_day_page(date_iso: str, all_dates: list[str], is_latest: bool) -> Pa
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{html.escape(date_pretty)} – {SITE_TITLE}</title>
-<meta name="description" content="SAP-News vom {html.escape(date_pretty)} — automatisch recherchiert und zusammengefasst.">
+<meta name="description" content="SAP-News-Übersicht vom {html.escape(date_pretty)}.">
 <link rel="stylesheet" href="../style.css">
 </head>
 <body>
@@ -189,30 +229,32 @@ def _render_day_page(date_iso: str, all_dates: list[str], is_latest: bool) -> Pa
 """
 
     ARCHIVE_DIR.mkdir(parents=True, exist_ok=True)
-    out_path = ARCHIVE_DIR / f"{date_iso}.html"
+    out_path = ARCHIVE_DIR / f"{edition_date}.html"
     out_path.write_text(page, encoding="utf-8")
     return out_path
 
 
-def _render_index(all_dates: list[str]) -> Path:
+def _render_index(all_dates: list[str], items_per_date: dict[str, list[dict]]) -> Path:
     DOCS_DIR.mkdir(parents=True, exist_ok=True)
     recent = list(reversed(all_dates))[:INDEX_LIMIT]
 
-    # --- Featured edition (oben groß) ---
+    # --- Featured edition ---
     if recent:
         latest_date = recent[0]
-        latest_md = MARKDOWN_DIR / f"sap_news_{latest_date}.md"
-        try:
-            latest_text = latest_md.read_text(encoding="utf-8")
-        except OSError:
-            latest_text = ""
-        latest_teaser = _extract_first_title(latest_text)
-        latest_count = _count_items(latest_text)
+        latest_items = items_per_date.get(latest_date, [])
+        latest_count = len(latest_items)
         latest_pretty = _format_date_de(latest_date, with_weekday=True)
-        teaser_html = (
-            f'<p class="featured-teaser">Top-Meldung: „{html.escape(latest_teaser)}“</p>'
-            if latest_teaser else ""
-        )
+        if latest_items:
+            top_title = latest_items[0].get("title", "")
+            teaser_html = (
+                f'<p class="featured-teaser">Top-Meldung: „{html.escape(top_title)}“</p>'
+                if top_title else ""
+            )
+        else:
+            teaser_html = (
+                '<p class="featured-teaser">Du bist auf dem aktuellen Stand — '
+                'keine neuen Meldungen in den letzten 7 Tagen.</p>'
+            )
         meldung_label = "Meldung" if latest_count == 1 else "Meldungen"
         featured_html = f"""<section class="featured" aria-labelledby="featured-heading">
   <div class="featured-tag">Aktuelle Ausgabe</div>
@@ -226,11 +268,11 @@ def _render_index(all_dates: list[str]) -> Path:
         featured_html = """<section class="featured featured-empty">
   <div class="featured-tag">Noch keine Ausgabe</div>
   <h2 class="featured-date">Die erste Recherche läuft …</h2>
-  <p class="featured-teaser">Sobald der tägliche Workflow gelaufen ist, erscheint hier die aktuelle Ausgabe.</p>
+  <p class="featured-teaser">Sobald der wöchentliche Workflow gelaufen ist, erscheint hier die aktuelle Ausgabe.</p>
 </section>"""
         archive_dates = []
 
-    # --- "So funktioniert's" — 3 Spalten ---
+    # --- So funktioniert's ---
     steps_html = "\n".join(
         f"""<li class="how-step">
   <span class="how-num">{i + 1}</span>
@@ -243,21 +285,16 @@ def _render_index(all_dates: list[str]) -> Path:
     )
 
     # --- Archivliste ---
-    archive_items: list[str] = []
+    archive_items_html: list[str] = []
     for date_iso in archive_dates:
-        md_path = MARKDOWN_DIR / f"sap_news_{date_iso}.md"
-        try:
-            text = md_path.read_text(encoding="utf-8")
-        except OSError:
-            text = ""
-        teaser = _extract_first_title(text)
-        count = _count_items(text)
+        items = items_per_date.get(date_iso, [])
+        count = len(items)
+        teaser = items[0].get("title", "") if items else ""
         teaser_html = f'<p class="archive-teaser">{html.escape(teaser)}</p>' if teaser else ""
         count_html = (
             f'<span class="archive-count">{count} {"Meldung" if count == 1 else "Meldungen"}</span>'
-            if count else ""
         )
-        archive_items.append(
+        archive_items_html.append(
             f"""<li class="archive-item">
   <a class="archive-link" href="archive/{date_iso}.html">
     <div class="archive-head">
@@ -270,8 +307,8 @@ def _render_index(all_dates: list[str]) -> Path:
         )
 
     archive_html = (
-        '<ul class="archive-list">\n' + "\n".join(archive_items) + "\n</ul>"
-        if archive_items
+        '<ul class="archive-list">\n' + "\n".join(archive_items_html) + "\n</ul>"
+        if archive_items_html
         else '<p class="archive-empty">Noch keine älteren Ausgaben vorhanden.</p>'
     )
 
@@ -280,7 +317,7 @@ def _render_index(all_dates: list[str]) -> Path:
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{SITE_TITLE} – Tägliche KI-kuratierte SAP-News</title>
+<title>{SITE_TITLE} – Wöchentliche KI-kuratierte SAP-News</title>
 <meta name="description" content="{html.escape(INTRO_SUBLINE)}">
 <link rel="stylesheet" href="style.css">
 </head>
@@ -320,14 +357,22 @@ def _render_index(all_dates: list[str]) -> Path:
 
 
 def render_all() -> None:
-    dates = _collect_dates()
-    if not dates:
-        logger.warning("Keine Markdown-Dateien gefunden — Index wird trotzdem erzeugt.")
-    latest = dates[-1] if dates else None
-    for date_iso in dates:
-        path = _render_day_page(date_iso, dates, is_latest=(date_iso == latest))
-        logger.info("Tagesseite gerendert: %s", path.relative_to(ROOT))
-    index_path = _render_index(dates)
+    all_items = list(load_items().values())
+    edition_dates = _collect_edition_dates()
+    logger.info("Datenbank: %d Items, %d Edition(en)", len(all_items), len(edition_dates))
+
+    items_per_date: dict[str, list[dict]] = {
+        ed: _items_for_edition(all_items, ed) for ed in edition_dates
+    }
+
+    latest = edition_dates[-1]
+    for ed in edition_dates:
+        path = _render_day_page(ed, edition_dates, items_per_date[ed], is_latest=(ed == latest))
+        logger.info(
+            "Edition %s: %d Item(s) → %s",
+            ed, len(items_per_date[ed]), path.relative_to(ROOT),
+        )
+    index_path = _render_index(edition_dates, items_per_date)
     logger.info("Index aktualisiert: %s", index_path.relative_to(ROOT))
 
 

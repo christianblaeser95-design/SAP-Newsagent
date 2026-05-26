@@ -432,6 +432,71 @@ main {
     font-size: 0.9rem;
 }
 
+/* === News-Items (Karten innerhalb einer Ausgabe) === */
+.news-item {
+    border-top: 1px solid var(--border);
+    padding: 1.5rem 0 1.25rem;
+}
+.news-item:first-child { border-top: none; padding-top: 0.5rem; }
+
+.item-title {
+    font-family: var(--font-serif);
+    font-size: 1.3rem;
+    line-height: 1.3;
+    margin: 0 0 0.4rem;
+    color: var(--fg);
+    font-weight: 700;
+}
+
+.item-meta {
+    margin: 0 0 0.8rem;
+    font-size: 0.88rem;
+    color: var(--muted);
+}
+
+.item-meta time { font-weight: 600; color: var(--fg-soft); }
+
+.item-source {
+    color: var(--accent);
+}
+
+.item-summary {
+    margin: 0 0 0.9rem;
+    color: var(--fg-soft);
+    line-height: 1.6;
+}
+
+.item-link {
+    display: inline-block;
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--accent);
+}
+
+/* === Empty State === */
+.empty-state {
+    padding: 2.5rem 1rem;
+    text-align: center;
+    border: 1px dashed var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+}
+
+.empty-headline {
+    font-family: var(--font-serif);
+    font-size: 1.25rem;
+    color: var(--fg);
+    margin: 0 0 0.6rem;
+}
+
+.empty-text {
+    margin: 0 auto;
+    max-width: 480px;
+    color: var(--muted);
+    font-size: 0.95rem;
+    line-height: 1.55;
+}
+
 /* === Markdown-Body innerhalb der Ausgabe === */
 .edition-body {
     font-size: 1.02rem;

@@ -114,34 +114,96 @@ def _clean_markdown(text: str) -> str:
 def _filter_by_date(text: str, cutoff: date, today: date) -> tuple[str, int]:
     """Entfernt News-Items, deren Publikationsdatum vor `cutoff` liegt.
 
-    Geht über die Markdown-Abschnitte (getrennt durch `---`) und prüft pro Item
-    die in `Datum: YYYY-MM-DD` angegebene Veröffentlichung. Items in der
-    Zukunft (> today + 1 Tag) werden ebenfalls verworfen — fast immer
-    halluzinierte Daten.
+    Nutzt den strukturierten Parser aus `parse.py`. Strategie:
+    1. Parse alle Items aus dem Markdown.
+    2. Erkenne pro Item dessen Position im Text anhand des Titels.
+    3. Schneide Items raus, deren Datum außerhalb des Zeitfensters liegt.
+    4. Header / Statistik bleiben unangetastet.
 
-    Header- und Statistik-Abschnitte (kein "Datum:"-Marker) werden nie
-    angetastet, damit Stand/Zeitfenster/Stats erhalten bleiben.
+    Items in der Zukunft (> today + 1 Tag) werden ebenfalls verworfen
+    (typischerweise halluzinierte Daten).
     """
     import re
 
-    chunks = re.split(r"^---\s*$", text, flags=re.MULTILINE)
-    item_date_re = re.compile(
-        r"Datum[:\s]+\**\s*(\d{4})-(\d{2})-(\d{2})", flags=re.IGNORECASE
+    from parse import (
+        LABEL_BLACKLIST,
+        TITLE_LINE_RE,
+        DATE_LABEL_RE,
     )
-    future_cutoff = today + timedelta(days=1)
-    kept: list[str] = []
-    removed = 0
 
-    for chunk in chunks:
-        match = item_date_re.search(chunk)
-        if not match:
-            # Kein Datums-Marker im Block (Header, Trenner, Statistik) → behalten.
-            kept.append(chunk)
+    future_cutoff = today + timedelta(days=1)
+    lines = text.splitlines()
+
+    # Zerlege das Markdown in "Frames": Header / Item / Item / ... / Footer
+    # Ein Item beginnt bei einem **Titel**-Header (nicht Label) und endet
+    # vor dem nächsten Titel ODER vor einer Label-Sektion ODER bei `---`.
+    def line_is_item_title(line: str) -> bool:
+        m = TITLE_LINE_RE.match(line.strip())
+        if not m:
+            return False
+        inner = m.group(1).strip()
+        if inner.endswith(":"):
+            return False
+        if inner.lower().rstrip(":") in LABEL_BLACKLIST:
+            return False
+        return True
+
+    def line_is_section_end(line: str) -> bool:
+        stripped = line.strip()
+        if stripped == "---":
+            return True
+        m = TITLE_LINE_RE.match(stripped)
+        if m:
+            inner = m.group(1).strip()
+            if inner.endswith(":"):
+                return True
+            if inner.lower().rstrip(":") in LABEL_BLACKLIST:
+                return True
+        if stripped.startswith("## "):
+            heading = stripped[3:].strip().lower().rstrip(":")
+            if heading in LABEL_BLACKLIST:
+                return True
+        return False
+
+    # Frames sammeln: jeder Frame ist (kind, lines) mit kind in {"header","item","footer","sep"}
+    frames: list[tuple[str, list[str]]] = []
+    current_kind = "header"
+    current_lines: list[str] = []
+
+    for line in lines:
+        if line_is_item_title(line):
+            # Vorigen Frame abschließen
+            if current_lines:
+                frames.append((current_kind, current_lines))
+            current_kind = "item"
+            current_lines = [line]
+        elif current_kind == "item" and line_is_section_end(line):
+            # Item-Sequenz endet hier
+            frames.append((current_kind, current_lines))
+            current_lines = [line]
+            current_kind = "footer"
+        else:
+            current_lines.append(line)
+
+    if current_lines:
+        frames.append((current_kind, current_lines))
+
+    # Filter pro Item
+    removed = 0
+    out_frames: list[tuple[str, list[str]]] = []
+    for kind, frame_lines in frames:
+        if kind != "item":
+            out_frames.append((kind, frame_lines))
+            continue
+        chunk_text = "\n".join(frame_lines)
+        m = DATE_LABEL_RE.search(chunk_text)
+        if not m:
+            out_frames.append((kind, frame_lines))
             continue
         try:
-            item_date = date(int(match.group(1)), int(match.group(2)), int(match.group(3)))
+            item_date = date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
         except ValueError:
-            kept.append(chunk)
+            out_frames.append((kind, frame_lines))
             continue
         if item_date < cutoff:
             logger.info("Filter: Item mit Datum %s < cutoff %s entfernt.", item_date, cutoff)
@@ -151,9 +213,12 @@ def _filter_by_date(text: str, cutoff: date, today: date) -> tuple[str, int]:
             logger.info("Filter: Item mit Zukunfts-Datum %s entfernt.", item_date)
             removed += 1
             continue
-        kept.append(chunk)
+        out_frames.append((kind, frame_lines))
 
-    return "---".join(kept), removed
+    result_lines: list[str] = []
+    for _, fl in out_frames:
+        result_lines.extend(fl)
+    return "\n".join(result_lines), removed
 
 
 def run_research() -> Path:
