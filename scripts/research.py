@@ -96,9 +96,21 @@ def run_research() -> Path:
 
     user_message = "\n".join(user_lines)
 
+    # allowed_callers=["direct"] schaltet Dynamic Filtering ab — nötig für Haiku 4.5,
+    # spart Tokens und macht die container_id-Logik überflüssig.
     tools = [
-        {"type": "web_search_20260209", "name": "web_search", "max_uses": MAX_TOOL_USES},
-        {"type": "web_fetch_20260209", "name": "web_fetch", "max_uses": MAX_TOOL_USES},
+        {
+            "type": "web_search_20260209",
+            "name": "web_search",
+            "max_uses": MAX_TOOL_USES,
+            "allowed_callers": ["direct"],
+        },
+        {
+            "type": "web_fetch_20260209",
+            "name": "web_fetch",
+            "max_uses": MAX_TOOL_USES,
+            "allowed_callers": ["direct"],
+        },
     ]
 
     client = anthropic.Anthropic(api_key=api_key)
