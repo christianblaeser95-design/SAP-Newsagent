@@ -183,10 +183,33 @@ def _format_inline_markdown(text: str) -> str:
     return escaped
 
 
+def _split_summary_and_relevance(summary_raw: str) -> tuple[str, str]:
+    """Trennt den Kernaussage-Teil von der "Relevanz für SAP-Beratung:" Sektion.
+
+    Gibt (kernaussage, relevanz) zurück. Wenn keine Relevanz-Sektion gefunden:
+    (summary_raw, "").
+    """
+    match = re.search(
+        r"\*\*\s*Relevanz für SAP[-\s]Beratung\s*:?\s*\*\*",
+        summary_raw,
+        flags=re.IGNORECASE,
+    )
+    if not match:
+        return summary_raw.strip(), ""
+    core = summary_raw[: match.start()].rstrip().rstrip(".").rstrip()
+    # Punkt am Ende der Kernaussage wiederherstellen, falls vorhanden gewesen.
+    if core and core[-1] not in ".!?":
+        core += "."
+    relevance_body = summary_raw[match.end():].strip()
+    return core, relevance_body
+
+
 def _render_item_html(item: dict) -> str:
     """Rendert ein einzelnes News-Item als HTML-Karte."""
     title = html.escape(item.get("title", "(ohne Titel)"))
-    summary = _format_inline_markdown(item.get("summary", ""))
+    core_raw, relevance_raw = _split_summary_and_relevance(item.get("summary", ""))
+    summary_html = _format_inline_markdown(core_raw)
+    relevance_html = _format_inline_markdown(relevance_raw) if relevance_raw else ""
     url = item.get("url", "")
     source = item.get("source", "") or _domain_from_url(url)
     pub = item.get("published_date", "")
@@ -204,10 +227,16 @@ def _render_item_html(item: dict) -> str:
         f'Originalartikel öffnen →</a>'
     ) if url else ""
 
+    relevance_block = (
+        f'<p class="item-relevance"><strong>Relevanz für SAP-Beratung:</strong> {relevance_html}</p>'
+        if relevance_html else ""
+    )
+
     return f"""<article class="news-item">
   <h2 class="item-title">{title}</h2>
   <p class="item-meta">{meta_html}</p>
-  <p class="item-summary">{summary}</p>
+  <p class="item-summary">{summary_html}</p>
+  {relevance_block}
   {link_html}
 </article>"""
 

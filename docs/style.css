@@ -461,9 +461,24 @@ main {
 }
 
 .item-summary {
-    margin: 0 0 0.9rem;
+    margin: 0 0 0.75rem;
     color: var(--fg-soft);
     line-height: 1.6;
+}
+
+.item-relevance {
+    margin: 0 0 0.9rem;
+    padding: 0.6rem 0.9rem;
+    border-left: 3px solid var(--accent);
+    background: var(--accent-soft);
+    border-radius: 3px;
+    color: var(--fg);
+    font-size: 0.95rem;
+    line-height: 1.55;
+}
+
+.item-relevance strong {
+    color: var(--accent);
 }
 
 .item-link {
