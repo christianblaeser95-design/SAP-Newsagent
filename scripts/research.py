@@ -88,6 +88,23 @@ def _clean_markdown(text: str) -> str:
 
     # Mehr als zwei aufeinanderfolgende Leerzeilen auf zwei reduzieren.
     text = re.sub(r"\n{3,}", "\n\n", text)
+
+    # Bloße URLs in Markdown-Links umwandeln — Anzeige: Domain.
+    # Greift NUR auf URLs, die NICHT bereits Teil eines Markdown-Links sind.
+    bare_url_re = re.compile(
+        r"(?<![\(\[<\"'=])https?://([^\s<>\"']+?)(?=[\s\.,;:!?\)\]]*(?:$|\n))",
+        flags=re.MULTILINE,
+    )
+
+    def _to_link(match: "re.Match[str]") -> str:
+        url = match.group(0)
+        # Domain extrahieren (host + ggf. erstes Pfadsegment unterdrücken).
+        host = match.group(1).split("/", 1)[0]
+        if host.startswith("www."):
+            host = host[4:]
+        return f"[{host}]({url})"
+
+    text = bare_url_re.sub(_to_link, text)
     return text.strip()
 
 

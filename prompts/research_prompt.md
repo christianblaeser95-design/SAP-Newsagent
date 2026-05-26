@@ -91,7 +91,8 @@ Pro News-Item:
 - **Titel** (deutsch)
 - Datum (verifiziert) & Quelle (Domain)
 - 2–3 Sätze: Kernaussage + Relevanz für SAP-Beratung
-- Direkter Link (validiert)
+- Direkter Link (validiert) — IMMER als Markdown-Link formatieren:
+  `[domain.com](https://volle-url)` (NICHT die nackte URL ausgeben)
 
 Wenn keine neuen News: "> Du bist auf dem aktuellen Stand."
 
