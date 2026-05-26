@@ -1,4 +1,4 @@
-"""Löscht Markdown- und HTML-Einträge älter als 30 Tage."""
+"""Löscht alte HTML-Wochenausgaben. Die JSONL-Datenbank wird NICHT angetastet."""
 from __future__ import annotations
 
 import logging
@@ -9,26 +9,21 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 ROOT = Path(__file__).resolve().parent.parent
-MARKDOWN_DIR = ROOT / "data" / "markdown"
 ARCHIVE_DIR = ROOT / "docs" / "archive"
 
-# 90 Tage ≈ 12 wöchentliche Ausgaben — sinnvoller Archivumfang bei Wochentakt.
+# 90 Tage ≈ 12 Wochenausgaben.
 RETENTION_DAYS = 90
-MD_RE = re.compile(r"^sap_news_(\d{4}-\d{2}-\d{2})\.md$")
 HTML_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})\.html$")
 
 
-def _cutoff_date() -> datetime:
-    return datetime.now(timezone.utc) - timedelta(days=RETENTION_DAYS)
-
-
-def _purge(directory: Path, pattern: re.Pattern[str]) -> int:
-    if not directory.exists():
+def cleanup() -> int:
+    """Entfernt HTML-Archive älter als RETENTION_DAYS. Gibt Anzahl gelöschter Dateien zurück."""
+    if not ARCHIVE_DIR.exists():
         return 0
-    cutoff = _cutoff_date().date()
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=RETENTION_DAYS)).date()
     removed = 0
-    for path in directory.iterdir():
-        match = pattern.match(path.name)
+    for path in ARCHIVE_DIR.iterdir():
+        match = HTML_RE.match(path.name)
         if not match:
             continue
         try:
@@ -42,13 +37,8 @@ def _purge(directory: Path, pattern: re.Pattern[str]) -> int:
                 removed += 1
             except OSError as exc:
                 logger.warning("Konnte %s nicht löschen: %s", path, exc)
+    logger.info("Cleanup fertig: %d HTML-Archiv(e) entfernt (>%d Tage).", removed, RETENTION_DAYS)
     return removed
-
-
-def cleanup() -> None:
-    md_removed = _purge(MARKDOWN_DIR, MD_RE)
-    html_removed = _purge(ARCHIVE_DIR, HTML_RE)
-    logger.info("Cleanup fertig: %d Markdown, %d HTML entfernt.", md_removed, html_removed)
 
 
 def main() -> int:

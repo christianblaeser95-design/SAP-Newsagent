@@ -21,7 +21,6 @@ from database import load_items
 logger = logging.getLogger(__name__)
 
 ROOT = Path(__file__).resolve().parent.parent
-MARKDOWN_DIR = ROOT / "data" / "markdown"
 DOCS_DIR = ROOT / "docs"
 ARCHIVE_DIR = DOCS_DIR / "archive"
 
@@ -31,7 +30,6 @@ MONTHS_DE = {
 }
 WEEKDAYS_DE = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"]
 
-MARKDOWN_RE = re.compile(r"^sap_news_(\d{4}-\d{2}-\d{2})\.md$")
 INDEX_LIMIT = 30
 WINDOW_DAYS = 7
 
@@ -74,25 +72,11 @@ def _format_date_de(date_iso: str | date, *, with_weekday: bool = False) -> str:
 
 
 def _collect_edition_dates(items: list[dict]) -> list[str]:
-    """Sammelt Edition-Daten:
+    """Generiert Edition-Daten: jeden Montag im Item-Datumsbereich + heute."""
+    dates: set[str] = {date.today().isoformat()}
 
-    1. Aus den Markdown-Dateien (= echte Recherche-Läufe).
-    2. PLUS automatisch jeden Montag im Datumsbereich der DB-Items,
-       sodass auch rückwirkend Wochenausgaben entstehen.
-    3. PLUS heute (für die laufende Woche).
-
-    Editionen ohne Items werden vom Renderer später ausgeblendet, falls leer.
-    """
-    dates: set[str] = set()
-    if MARKDOWN_DIR.exists():
-        for path in MARKDOWN_DIR.glob("sap_news_*.md"):
-            match = MARKDOWN_RE.match(path.name)
-            if match:
-                dates.add(match.group(1))
-
-    # Aus DB-Items: für jeden Montag im Bereich [earliest_pub, today] eine Edition.
     if items:
-        pub_dates = []
+        pub_dates: list[date] = []
         for item in items:
             try:
                 pub_dates.append(datetime.strptime(item["published_date"], "%Y-%m-%d").date())
@@ -101,18 +85,12 @@ def _collect_edition_dates(items: list[dict]) -> list[str]:
         if pub_dates:
             earliest = min(pub_dates)
             latest = max(date.today(), max(pub_dates))
-            # Auf den nächsten Montag ab earliest
             first_monday = earliest + timedelta(days=(7 - earliest.weekday()) % 7)
             cur = first_monday
             while cur <= latest:
                 dates.add(cur.isoformat())
                 cur += timedelta(days=7)
 
-    # Heutige Edition (falls noch nicht enthalten).
-    dates.add(date.today().isoformat())
-
-    if not dates:
-        dates = {date.today().isoformat()}
     return sorted(dates)
 
 

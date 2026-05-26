@@ -43,19 +43,15 @@ docs/                              # GitHub Pages Root
   index.html                       # Startseite (generiert)
   style.css
   archive/YYYY-MM-DD.html          # Pro Wochenausgabe eine Seite (generiert)
-data/
-  news.jsonl                       # Persistente Item-Datenbank (Source of Truth)
-  markdown/sap_news_*.md           # Roh-Antworten des Modells (Audit-Trail)
-prompts/research_prompt.md         # Recherche-Prompt (frei anpassbar)
+data/news.jsonl                    # Persistente Item-Datenbank (Source of Truth)
+prompts/research_prompt.md         # Recherche-Prompt
 scripts/
   main.py                          # Orchestrierung: research → render → cleanup
-  research.py                      # Anthropic API + Datums-Post-Filter + JSONL-Append
+  research.py                      # API-Call → Datums-Filter → JSONL-Append
   parse.py                         # Markdown → strukturierte Items
   database.py                      # JSONL-Lesen/Schreiben (Dedup nach URL)
   render.py                        # JSONL → HTML (Editionen + Index)
-  cleanup.py                       # Löscht alte HTML-/Markdown-Dateien (>90 Tage)
-  import_markdown.py               # Einmaliger Import bestehender Markdowns in DB
-  seed_may_2026.py                 # Einmaliger Seed mit Mai-2026-Recherche
+  cleanup.py                       # Löscht HTML-Archive >90 Tage
 requirements.txt
 ```
 
@@ -66,7 +62,7 @@ requirements.txt
   Konstante `MODEL`) — benötigt Anthropic-API-Tier 2.
 - **Tools:** `web_search_20260209` + `web_fetch_20260209` (GA), beide mit
   `allowed_callers=["direct"]` (Haiku unterstützt kein Programmatic Tool Calling).
-- **Tool-Limit:** `max_uses=12` pro Tool und Lauf.
+- **Tool-Limit:** `max_uses=12` pro Tool und Lauf. Budget ~$0,25 pro Lauf = **~$1/Monat**.
 - **Zeitfenster:** Letzte 7 Tage (`scripts/research.py`, `cutoff_date`).
 - **Themenfokus** (in `prompts/research_prompt.md` definiert):
   - Primär: SAP SD, Order-to-Cash, Pricing, ATP, Fiori SD, BTP/CPI-Integration
@@ -97,9 +93,6 @@ python scripts/render.py
 
 # Nur alte Einträge aufräumen
 python scripts/cleanup.py
-
-# Bestehende Markdown-Dateien in DB importieren (einmalig)
-python scripts/import_markdown.py
 ```
 
 Lokale Vorschau: `docs/index.html` im Browser öffnen.
@@ -113,13 +106,13 @@ Lokale Vorschau: `docs/index.html` im Browser öffnen.
   geschrieben (Exit-Code ≠ 0), damit der Auto-Commit nichts Kaputtes pusht.
 - **URL-Dedup:** Items werden in der DB nach URL eindeutig gehalten. Erneutes
   Auffinden eines Items aktualisiert es höchstens (Summary, Source).
-- **Aufbewahrung:** `cleanup.py` löscht Markdown-/HTML-Dateien älter als 90 Tage.
+- **Aufbewahrung:** `cleanup.py` löscht HTML-Archive älter als 90 Tage.
   Die **JSONL-Datenbank wird nie automatisch gekürzt** — sie wächst kontinuierlich.
 
 ## Kosten
 
-- Haiku 4.5, wöchentlich, mit `max_uses=12`: ~$0,05 pro Lauf → **~$0,20/Monat**.
-- Sonnet 4.6 (falls upgegradet): ~$0,15 pro Lauf → ~$0,60/Monat.
+- Haiku 4.5, wöchentlich, mit 16 Suchen + ~12 fetches: ~$0,25 pro Lauf → **~$1/Monat**.
+- Sonnet 4.6 (falls upgegradet): ~$0,40 pro Lauf → ~$1,60/Monat.
 
 ## GitHub-Einrichtung (einmalig)
 

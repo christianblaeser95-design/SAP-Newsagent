@@ -12,17 +12,19 @@ Aufgaben durchführt.
 ## Architektur (kurz)
 
 ```
-Workflow (Mo 06:00 UTC) ─► research.py ─► Markdown vom Modell
+Workflow (Mo 06:00 UTC) ─► research.py
                               │
-                              ├─► parse.py extrahiert Items
-                              │
-                              └─► database.py: append in data/news.jsonl (URL-Dedup)
+                              ├─ Anthropic API mit web_search + web_fetch
+                              ├─ Markdown-Antwort cleanen + Datums-Filter
+                              ├─ parse_items() → strukturierte Items
+                              └─ upsert in data/news.jsonl (URL-Dedup)
 
 render.py liest news.jsonl ─► für jeden Edition-Termin Items in [date-7d, date] ─► docs/archive/*.html + docs/index.html
 ```
 
-**Source of Truth: `data/news.jsonl`** — eine Zeile pro Item. Markdown-Dateien
-in `data/markdown/` sind nur Audit-Log. HTML in `docs/` ist generierter Output.
+**Source of Truth: `data/news.jsonl`** — eine Zeile pro Item.
+HTML in `docs/` ist generierter Output. Es gibt **keine** Markdown-Audit-Dateien
+mehr — die Modell-Antwort wird direkt geparst und nicht persistiert.
 
 ### Item-Schema (eine JSONL-Zeile)
 
@@ -45,11 +47,10 @@ erfolgt nach URL.
 
 Eine "Edition" = ein Datum. Die Edition zeigt Items mit `published_date` in
 `[edition_date - 7d, edition_date]`. Edition-Daten werden in
-`render._collect_edition_dates` aus drei Quellen gemerged:
+`render._collect_edition_dates` automatisch generiert:
 
-1. Allen `data/markdown/sap_news_YYYY-MM-DD.md` (= echte Workflow-Läufe)
+1. Heute (für die laufende Woche)
 2. Jeder Montag im Bereich `[earliest_item_pub, max(today, latest_item_pub)]`
-3. Plus `today` (für die laufende Woche)
 
 Editionen ohne Items werden vom Index ausgeblendet — außer der heutigen
 (zeigt dann den Empty-State "Du bist auf dem aktuellen Stand").
@@ -75,7 +76,7 @@ python scripts/main.py
 
 ### Items manuell hinzufügen (kein API-Verbrauch)
 
-Vorlage: `scripts/seed_may_2026.py`. Pattern:
+Pattern:
 
 ```python
 from database import load_items, save_items
@@ -191,12 +192,9 @@ Der Workflow committet automatisch. Vor dem manuellen Commit/Push immer
 | `scripts/parse.py` | Markdown-Block → Item-Dict |
 | `scripts/database.py` | JSONL lesen/schreiben |
 | `scripts/render.py` | JSONL → HTML |
-| `scripts/cleanup.py` | Alte Dateien löschen (>90 Tage) |
-| `scripts/import_markdown.py` | Bestehende Markdowns in DB (einmalig) |
-| `scripts/seed_may_2026.py` | Vorlage für manuelle Item-Insertion |
+| `scripts/cleanup.py` | Alte HTML-Archive löschen (>90 Tage) |
 | `prompts/research_prompt.md` | Recherche-Prompt (frei editierbar) |
 | `data/news.jsonl` | Item-Datenbank |
-| `data/markdown/sap_news_*.md` | Audit-Log der Modell-Antworten |
 | `docs/index.html` | Startseite (generiert) |
 | `docs/archive/*.html` | Wochenausgaben (generiert) |
 | `docs/style.css` | Site-Styling |
