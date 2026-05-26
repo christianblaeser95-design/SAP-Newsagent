@@ -24,15 +24,31 @@ WEEKDAYS_DE = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samst
 
 DATE_RE = re.compile(r"^sap_news_(\d{4}-\d{2}-\d{2})\.md$")
 INDEX_LIMIT = 30
-ABOUT_INTRO = (
-    "Eine automatisch erstellte, tägliche Übersicht relevanter SAP-Nachrichten der "
-    "letzten 24 Stunden — kuratiert für SAP-Beraterinnen und -Berater."
-)
-ABOUT_HOW = (
-    "Jeden Morgen recherchiert ein KI-Agent (Anthropic Claude) das Web, validiert "
-    "Quellen, filtert auf SAP-Relevanz und entfernt Duplikate gegen den Vortag."
-)
 SITE_TITLE = "SAP Newsagent"
+INTRO_HEADLINE = "Die wichtigsten SAP-News des Tages."
+INTRO_SUBLINE = (
+    "Ein KI-Agent recherchiert jeden Morgen automatisch das Web, validiert die "
+    "Quellen und fasst die Meldungen der letzten 24 Stunden für SAP-Beraterinnen "
+    "und SAP-Berater zusammen."
+)
+HOW_STEPS = [
+    (
+        "Täglich um 8 Uhr",
+        "Eine neue Ausgabe wird automatisch erstellt — kein manuelles Anstoßen nötig.",
+    ),
+    (
+        "Web-Recherche & Validierung",
+        "Acht thematische Suchen, jede Quelle vor Aufnahme auf Aktualität und Inhalt geprüft.",
+    ),
+    (
+        "Dedupliziert & gefiltert",
+        "Nur Meldungen mit konkretem News-Wert (Releases, Produkte, Zahlen, Partnerschaften).",
+    ),
+]
+USAGE_NOTE = (
+    "Klicke auf eine Ausgabe, um die Meldungen des jeweiligen Tages zu lesen. "
+    "Innerhalb einer Ausgabe kannst du per Pfeil-Links bequem zum Vor- oder Folgetag wechseln."
+)
 
 
 def _format_date_de(date_iso: str, *, with_weekday: bool = False) -> str:
@@ -163,7 +179,7 @@ def _render_index(all_dates: list[str]) -> Path:
     DOCS_DIR.mkdir(parents=True, exist_ok=True)
     recent = list(reversed(all_dates))[:INDEX_LIMIT]
 
-    # Hero / aktuelle Ausgabe.
+    # --- Featured edition (oben groß) ---
     if recent:
         latest_date = recent[0]
         latest_md = MARKDOWN_DIR / f"sap_news_{latest_date}.md"
@@ -175,25 +191,39 @@ def _render_index(all_dates: list[str]) -> Path:
         latest_count = _count_items(latest_text)
         latest_pretty = _format_date_de(latest_date, with_weekday=True)
         teaser_html = (
-            f'<p class="hero-teaser">Top-Meldung: „{html.escape(latest_teaser)}“</p>'
+            f'<p class="featured-teaser">Top-Meldung: „{html.escape(latest_teaser)}“</p>'
             if latest_teaser else ""
         )
-        hero_html = f"""<section class="hero">
-  <p class="hero-kicker">Aktuelle Ausgabe · {latest_count} {"Meldung" if latest_count == 1 else "Meldungen"}</p>
-  <h2 class="hero-date">{html.escape(latest_pretty)}</h2>
+        meldung_label = "Meldung" if latest_count == 1 else "Meldungen"
+        featured_html = f"""<section class="featured" aria-labelledby="featured-heading">
+  <div class="featured-tag">Aktuelle Ausgabe</div>
+  <h2 id="featured-heading" class="featured-date">{html.escape(latest_pretty)}</h2>
+  <p class="featured-meta">{latest_count} {meldung_label} · automatisch erstellt</p>
   {teaser_html}
-  <a class="hero-cta" href="archive/{latest_date}.html">Ausgabe lesen →</a>
+  <a class="featured-cta" href="archive/{latest_date}.html">Ausgabe lesen →</a>
 </section>"""
         archive_dates = recent[1:]
     else:
-        hero_html = """<section class="hero hero-empty">
-  <p class="hero-kicker">Noch keine Ausgabe</p>
-  <h2 class="hero-date">Die erste Recherche läuft …</h2>
-  <p class="hero-teaser">Sobald der tägliche Workflow gelaufen ist, erscheint hier die aktuelle Ausgabe.</p>
+        featured_html = """<section class="featured featured-empty">
+  <div class="featured-tag">Noch keine Ausgabe</div>
+  <h2 class="featured-date">Die erste Recherche läuft …</h2>
+  <p class="featured-teaser">Sobald der tägliche Workflow gelaufen ist, erscheint hier die aktuelle Ausgabe.</p>
 </section>"""
         archive_dates = []
 
-    # Archivliste.
+    # --- "So funktioniert's" — 3 Spalten ---
+    steps_html = "\n".join(
+        f"""<li class="how-step">
+  <span class="how-num">{i + 1}</span>
+  <div>
+    <h3 class="how-title">{html.escape(title)}</h3>
+    <p class="how-desc">{html.escape(desc)}</p>
+  </div>
+</li>"""
+        for i, (title, desc) in enumerate(HOW_STEPS)
+    )
+
+    # --- Archivliste ---
     archive_items: list[str] = []
     for date_iso in archive_dates:
         md_path = MARKDOWN_DIR / f"sap_news_{date_iso}.md"
@@ -232,24 +262,34 @@ def _render_index(all_dates: list[str]) -> Path:
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{SITE_TITLE} – Tägliche KI-kuratierte SAP-News</title>
-<meta name="description" content="{html.escape(ABOUT_INTRO)}">
+<meta name="description" content="{html.escape(INTRO_SUBLINE)}">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 {_site_header("index.html")}
 <main class="index-page">
-  <section class="about">
-    <h1 class="about-headline">Was ist der SAP Newsagent?</h1>
-    <p class="about-lead">{html.escape(ABOUT_INTRO)}</p>
-    <p class="about-detail">{html.escape(ABOUT_HOW)}</p>
+
+  <section class="intro">
+    <p class="intro-eyebrow">Für SAP-Beraterinnen und SAP-Berater</p>
+    <h1 class="intro-headline">{html.escape(INTRO_HEADLINE)}</h1>
+    <p class="intro-subline">{html.escape(INTRO_SUBLINE)}</p>
   </section>
 
-  {hero_html}
+  {featured_html}
 
-  <section class="archive">
-    <h2 class="section-title">Frühere Ausgaben</h2>
+  <section class="how" aria-labelledby="how-heading">
+    <h2 id="how-heading" class="section-title">So funktioniert's</h2>
+    <ol class="how-list">
+{steps_html}
+    </ol>
+    <p class="how-usage">{html.escape(USAGE_NOTE)}</p>
+  </section>
+
+  <section class="archive" aria-labelledby="archive-heading">
+    <h2 id="archive-heading" class="section-title">Frühere Ausgaben</h2>
     {archive_html}
   </section>
+
 </main>
 {_site_footer()}
 </body>

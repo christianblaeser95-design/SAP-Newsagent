@@ -101,64 +101,80 @@ main {
     padding: 2.5rem 1.5rem 4rem;
 }
 
-/* === Index: "Was ist das?" === */
-.about {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-left: 4px solid var(--accent);
-    padding: 1.5rem 1.75rem;
-    border-radius: 4px;
+/* === Index: Intro (Hero-Headline) === */
+.intro {
+    text-align: center;
+    padding: 1.5rem 0 2.5rem;
+    border-bottom: 1px solid var(--border);
     margin-bottom: 2.5rem;
 }
 
-.about-headline {
-    font-family: var(--font-serif);
+.intro-eyebrow {
     margin: 0 0 0.75rem;
-    font-size: 1.25rem;
-    color: var(--fg);
-}
-
-.about-lead {
-    margin: 0 0 0.5rem;
-    font-size: 1.05rem;
-    color: var(--fg-soft);
-}
-
-.about-detail {
-    margin: 0;
-    font-size: 0.95rem;
-    color: var(--muted);
-}
-
-/* === Index: Hero (aktuelle Ausgabe) === */
-.hero {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: 2rem 1.75rem;
-    margin-bottom: 2.5rem;
-    box-shadow: var(--shadow);
-}
-
-.hero-kicker {
-    margin: 0 0 0.5rem;
     text-transform: uppercase;
-    letter-spacing: 0.1em;
-    font-size: 0.8rem;
+    letter-spacing: 0.14em;
+    font-size: 0.78rem;
     color: var(--accent);
     font-weight: 700;
 }
 
-.hero-date {
+.intro-headline {
     font-family: var(--font-serif);
+    font-size: 2.4rem;
+    line-height: 1.1;
     margin: 0 0 1rem;
+    color: var(--fg);
+    letter-spacing: -0.015em;
+}
+
+.intro-subline {
+    max-width: 600px;
+    margin: 0 auto;
+    font-size: 1.1rem;
+    color: var(--fg-soft);
+    line-height: 1.55;
+}
+
+/* === Index: Featured (aktuelle Ausgabe) === */
+.featured {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 2rem 1.75rem;
+    margin-bottom: 3rem;
+    box-shadow: var(--shadow);
+    position: relative;
+}
+
+.featured-tag {
+    display: inline-block;
+    background: var(--accent);
+    color: #fff;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 0.3rem 0.7rem;
+    border-radius: 999px;
+    margin-bottom: 1rem;
+}
+
+.featured-date {
+    font-family: var(--font-serif);
+    margin: 0 0 0.4rem;
     font-size: 2rem;
     line-height: 1.15;
     color: var(--fg);
     letter-spacing: -0.01em;
 }
 
-.hero-teaser {
+.featured-meta {
+    margin: 0 0 1rem;
+    color: var(--muted);
+    font-size: 0.9rem;
+}
+
+.featured-teaser {
     margin: 0 0 1.5rem;
     font-size: 1.1rem;
     color: var(--fg-soft);
@@ -166,22 +182,86 @@ main {
     font-style: italic;
 }
 
-.hero-cta {
+.featured-cta {
     display: inline-block;
     background: var(--accent);
     color: #fff;
-    padding: 0.65rem 1.25rem;
+    padding: 0.75rem 1.4rem;
     border-radius: 4px;
     font-weight: 600;
-    font-size: 0.95rem;
+    font-size: 1rem;
 }
 
-.hero-cta:hover {
+.featured-cta:hover {
     text-decoration: none;
     filter: brightness(1.1);
 }
 
-.hero-empty .hero-cta { display: none; }
+.featured-empty .featured-cta { display: none; }
+
+/* === Index: "So funktioniert's" === */
+.how {
+    margin-bottom: 3rem;
+}
+
+.how-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.25rem;
+}
+
+.how-step {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 1.25rem 1.25rem 1.4rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.how-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 999px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-weight: 700;
+    font-size: 1rem;
+    font-family: var(--font-serif);
+}
+
+.how-title {
+    font-family: var(--font-serif);
+    font-size: 1.1rem;
+    margin: 0 0 0.4rem;
+    color: var(--fg);
+    line-height: 1.25;
+}
+
+.how-desc {
+    margin: 0;
+    font-size: 0.95rem;
+    color: var(--muted);
+    line-height: 1.5;
+}
+
+.how-usage {
+    margin: 1.5rem 0 0;
+    padding: 1rem 1.25rem;
+    background: var(--accent-soft);
+    border-left: 3px solid var(--accent);
+    border-radius: 3px;
+    color: var(--fg-soft);
+    font-size: 0.95rem;
+    line-height: 1.55;
+}
 
 /* === Index: Archivliste === */
 .section-title {
@@ -457,7 +537,13 @@ main {
     .site-tagline { font-size: 0.75rem; }
     main { padding: 1.5rem 1rem 3rem; }
     .edition { padding: 1.5rem 1.25rem; }
-    .edition-date, .hero-date { font-size: 1.6rem; }
+    .edition-date, .featured-date { font-size: 1.6rem; }
+    .intro-headline { font-size: 1.75rem; }
+    .intro-subline { font-size: 1rem; }
+    .intro { padding: 0.5rem 0 1.5rem; margin-bottom: 1.75rem; }
+    .featured { padding: 1.5rem 1.25rem; margin-bottom: 2rem; }
+    .how-list { grid-template-columns: 1fr; gap: 0.75rem; }
+    .how-step { flex-direction: row; align-items: flex-start; }
     .day-nav { font-size: 0.85rem; }
     .archive-head { flex-direction: column; align-items: flex-start; gap: 0.15rem; }
 }
