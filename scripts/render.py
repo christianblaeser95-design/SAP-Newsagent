@@ -73,19 +73,46 @@ def _format_date_de(date_iso: str | date, *, with_weekday: bool = False) -> str:
     return base
 
 
-def _collect_edition_dates() -> list[str]:
-    """Sammelt Edition-Daten aus den Markdown-Dateien (Recherche-Läufe).
+def _collect_edition_dates(items: list[dict]) -> list[str]:
+    """Sammelt Edition-Daten:
 
-    Wenn keine vorhanden sind, gibt es eine virtuelle "Heute"-Edition.
+    1. Aus den Markdown-Dateien (= echte Recherche-Läufe).
+    2. PLUS automatisch jeden Montag im Datumsbereich der DB-Items,
+       sodass auch rückwirkend Wochenausgaben entstehen.
+    3. PLUS heute (für die laufende Woche).
+
+    Editionen ohne Items werden vom Renderer später ausgeblendet, falls leer.
     """
-    dates: list[str] = []
+    dates: set[str] = set()
     if MARKDOWN_DIR.exists():
         for path in MARKDOWN_DIR.glob("sap_news_*.md"):
             match = MARKDOWN_RE.match(path.name)
             if match:
-                dates.append(match.group(1))
+                dates.add(match.group(1))
+
+    # Aus DB-Items: für jeden Montag im Bereich [earliest_pub, today] eine Edition.
+    if items:
+        pub_dates = []
+        for item in items:
+            try:
+                pub_dates.append(datetime.strptime(item["published_date"], "%Y-%m-%d").date())
+            except (KeyError, ValueError):
+                continue
+        if pub_dates:
+            earliest = min(pub_dates)
+            latest = max(date.today(), max(pub_dates))
+            # Auf den nächsten Montag ab earliest
+            first_monday = earliest + timedelta(days=(7 - earliest.weekday()) % 7)
+            cur = first_monday
+            while cur <= latest:
+                dates.add(cur.isoformat())
+                cur += timedelta(days=7)
+
+    # Heutige Edition (falls noch nicht enthalten).
+    dates.add(date.today().isoformat())
+
     if not dates:
-        dates = [date.today().isoformat()]
+        dates = {date.today().isoformat()}
     return sorted(dates)
 
 
@@ -358,12 +385,26 @@ def _render_index(all_dates: list[str], items_per_date: dict[str, list[dict]]) -
 
 def render_all() -> None:
     all_items = list(load_items().values())
-    edition_dates = _collect_edition_dates()
-    logger.info("Datenbank: %d Items, %d Edition(en)", len(all_items), len(edition_dates))
+    all_edition_dates = _collect_edition_dates(all_items)
 
     items_per_date: dict[str, list[dict]] = {
-        ed: _items_for_edition(all_items, ed) for ed in edition_dates
+        ed: _items_for_edition(all_items, ed) for ed in all_edition_dates
     }
+
+    # Tagesseiten: für jede Edition mit Items ODER für die heutige Edition
+    # (auch wenn leer — Empty-State zeigt "Du bist auf dem aktuellen Stand").
+    today_iso = date.today().isoformat()
+    edition_dates = [
+        ed for ed in all_edition_dates
+        if items_per_date[ed] or ed == today_iso
+    ]
+    if not edition_dates:
+        edition_dates = [today_iso]
+
+    logger.info(
+        "Datenbank: %d Items, %d Edition(en) mit Inhalt (von %d insgesamt geprüft)",
+        len(all_items), len(edition_dates), len(all_edition_dates),
+    )
 
     latest = edition_dates[-1]
     for ed in edition_dates:
