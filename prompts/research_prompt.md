@@ -38,8 +38,8 @@ Verwende von hier an NUR noch diese drei Werte.
 - Notiere: "Vergleichsbasis: <gefundener_dateiname> (Inhalt übernommen, Datum ignoriert)"
 
 ## Schritt 2: Suche durchführen
-Führe MINDESTENS folgende 8 Suchen aus (nicht weniger, auch wenn du denkst,
-du hast schon genug):
+
+### Teil A — 8 generische Suchen (PFLICHT, nicht weniger):
 1. `SAP S/4HANA release`
 2. `SAP Cloud ERP announcement`
 3. `SAP quarterly results`
@@ -49,9 +49,33 @@ du hast schon genug):
 7. `SAP partnership announcement`
 8. `news.sap.com latest`
 
-Erwartete Rohtrefferzahl: **40–80 Treffer**. Wenn du weniger als 30 hast,
-führe weitere Suchen mit Synonymen durch (z. B. `SAP BTP`, `SAP Joule AI`,
-`SAP Datasphere`).
+### Teil B — Pro Quelle eine `site:`-Suche (PFLICHT, eine Suche je Quelle):
+
+Diese kuratierten Quellen liefern den Mix aus SAP-eigenen und unabhängigen
+Perspektiven. Führe für JEDE eine gezielte Suche aus:
+
+**SAP-nahe Fachpresse (Prio 2):**
+9. `SAP site:sapinsider.org`
+10. `SAP site:erp.today`
+11. `SAP site:diginomica.com`
+
+**Etablierte Enterprise-IT-Journalismus (Prio 3, nur SAP-spezifische Artikel):**
+12. `SAP site:computerweekly.com`
+13. `SAP site:siliconangle.com`
+14. `SAP site:theregister.com`
+
+**Deutschsprachige Tech-/Wirtschaftspresse (Prio 3, nur SAP-spezifisch):**
+15. `SAP site:heise.de`
+16. `SAP site:handelsblatt.com`
+
+Erwartete Rohtrefferzahl gesamt: **50–100 Treffer**. Wenn weniger als 30,
+weitere Suchen mit Synonymen (`SAP BTP`, `SAP Joule AI`, `SAP Datasphere`).
+
+### Verbindlich:
+- Aus den Treffern müssen am Ende **mindestens 2 Items aus Prio-2- oder
+  Prio-3-Quellen** in die finale Liste kommen, sofern verfügbar.
+- Wenn eine Quelle in der Woche keinen relevanten Artikel hat: kein Zwang,
+  einen mittelmäßigen aufzunehmen — Qualität geht vor Quote.
 
 Themen-Priorität für Auswahl / Reihenfolge in der Ausgabe siehe Schritt 4
 (SD / Order-to-Cash zuerst, dann Cloud/AI/Integration, dann Sonstiges).

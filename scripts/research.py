@@ -18,7 +18,9 @@ MARKDOWN_DIR = ROOT / "data" / "markdown"
 
 MODEL = "claude-haiku-4-5"
 MAX_TOKENS = 8000
-MAX_TOOL_USES = 12
+# 18 reicht für 16 Suchen + ~16 web_fetch-Validierungen.
+# Budget pro Lauf bei Haiku 4.5: ~$0.30 (= $1.20/Monat bei Wochentakt).
+MAX_TOOL_USES = 18
 
 
 def _berlin_now() -> datetime:
