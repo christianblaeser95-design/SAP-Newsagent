@@ -38,25 +38,23 @@ Verwende von hier an NUR noch diese drei Werte.
 - Notiere: "Vergleichsbasis: <gefundener_dateiname> (Inhalt übernommen, Datum ignoriert)"
 
 ## Schritt 2: Suche durchführen
+Führe MINDESTENS folgende 8 Suchen aus (nicht weniger, auch wenn du denkst,
+du hast schon genug):
+1. `SAP S/4HANA release`
+2. `SAP Cloud ERP announcement`
+3. `SAP quarterly results`
+4. `SAP logistics SCM news`
+5. `SAP news today`
+6. `SAP press release`
+7. `SAP partnership announcement`
+8. `news.sap.com latest`
 
-Themen- UND quellenorientierte Suchen. Mindestens diese 8:
+Erwartete Rohtrefferzahl: **40–80 Treffer**. Wenn du weniger als 30 hast,
+führe weitere Suchen mit Synonymen durch (z. B. `SAP BTP`, `SAP Joule AI`,
+`SAP Datasphere`).
 
-**Primärer Themenfokus (SD / Order-to-Cash):**
-1. `SAP Sales Distribution SD news` (offen)
-2. `S/4HANA Order-to-Cash OR pricing OR ATP` (offen)
-3. `SAP Fiori SD apps update` (offen)
-4. `SAP BTP CPI SD integration` (offen)
-
-**Sekundärer Themenfokus (Cloud, AI, Integration, Plattform):**
-5. `SAP Cloud BTP Joule news` (SAP-Quellen erwartet)
-6. `SAP AI agents OR Joule Studio` (SAP-Quellen erwartet)
-
-**SAP-eigene Pressestelle und SAP-nahe Fachpresse:**
-7. `news.sap.com latest` (SAP News Center)
-8. `SAP site:blogs.sap.com OR site:community.sap.com OR site:sapinsider.org` (SAP-nahe Quellen)
-
-Erwartete Rohtrefferzahl: 40–80 Treffer. Wenn weniger als 30, weitere Suchen
-(`SAP Event Mesh`, `SAP Datasphere`, `S/4HANA Cloud SD Fiori update`).
+Themen-Priorität für Auswahl / Reihenfolge in der Ausgabe siehe Schritt 4
+(SD / Order-to-Cash zuerst, dann Cloud/AI/Integration, dann Sonstiges).
 
 ## Schritt 3: Roh-Inventur
 Erstelle eine interne Tabelle ALLER gefundenen Treffer mit Titel, URL, Datum (falls genannt),
