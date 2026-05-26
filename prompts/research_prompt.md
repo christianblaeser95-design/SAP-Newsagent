@@ -1,5 +1,17 @@
 # Prompt: Tägliche SAP-News-Recherche (mit Deduplizierung)
 
+## Ausgaberegel (HARTE REGEL — ÜBER ALLEM)
+Die Schritte 0–6 sind **interne Arbeitsschritte**. Führe sie still aus.
+Deine ANTWORT enthält AUSSCHLIESSLICH das Markdown aus Schritt 7 — sonst nichts.
+
+VERBOTEN in deiner Antwort:
+- Sätze wie "Ich führe jetzt die Recherche durch", "Schritt X:", "Jetzt validiere ich..."
+- Zwischenüberschriften wie "**Schritt 0**", "**Schritt 1**" etc.
+- Aufzählung der durchgeführten Suchen
+- Jegliche Beschreibung deines Vorgehens
+
+Deine Antwort MUSS mit der Zeile `# Stand: <JETZT> Europe/Berlin` beginnen. Kein Wort davor.
+
 ## Schritt 0: Datum ermitteln (HARTE REGEL — VOR ALLEM ANDEREN)
 Ermittle das HEUTIGE Datum AUSSCHLIESSLICH aus einer dieser Quellen, in dieser Reihenfolge:
 1. Systemzeit / Tool zum Abrufen der aktuellen Zeit (Zeitzone: Europe/Berlin)

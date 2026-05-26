@@ -65,6 +65,32 @@ def _extract_text(content_blocks) -> str:
     return "\n\n".join(parts).strip()
 
 
+def _clean_markdown(text: str) -> str:
+    """Schneidet Prozess-Vorrede ab und normalisiert Leerzeilen.
+
+    Falls das Modell trotz Prompt-Regel Schritt-Geplauder ausgibt, behalten wir
+    nur den Teil ab `# Stand:` / `Stand:` — also den eigentlichen Report.
+    """
+    import re
+
+    # Suche den Beginn des eigentlichen Reports.
+    match = re.search(r"^#{0,3}\s*\**\s*Stand:\s*", text, flags=re.MULTILINE | re.IGNORECASE)
+    if match:
+        text = text[match.start():]
+        # Sicherstellen, dass der Bericht mit "# Stand:" beginnt (normalisiert).
+        text = re.sub(
+            r"^#{0,3}\s*\**\s*Stand:\s*",
+            "# Stand: ",
+            text,
+            count=1,
+            flags=re.IGNORECASE,
+        )
+
+    # Mehr als zwei aufeinanderfolgende Leerzeilen auf zwei reduzieren.
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text.strip()
+
+
 def run_research() -> Path:
     """Führt die Recherche aus und speichert die Markdown-Datei. Gibt den Pfad zurück."""
     api_key = os.environ.get("ANTHROPIC_API_KEY")
@@ -172,6 +198,9 @@ def run_research() -> Path:
     markdown = _extract_text(final_response.content)
     if not markdown:
         raise RuntimeError("Antwort enthält keinen Text — Datei wird NICHT geschrieben.")
+    markdown = _clean_markdown(markdown)
+    if not markdown:
+        raise RuntimeError("Antwort enthält nach Cleanup keinen Text — Datei wird NICHT geschrieben.")
 
     MARKDOWN_DIR.mkdir(parents=True, exist_ok=True)
     out_path = MARKDOWN_DIR / f"sap_news_{today_iso}.md"
