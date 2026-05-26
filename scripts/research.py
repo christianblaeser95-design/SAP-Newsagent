@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 import os
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -43,15 +43,18 @@ def _find_previous_markdown(today_iso: str) -> tuple[str, str] | None:
         return None
 
 
-def _build_system_prompt(prompt_body: str, today: str, yesterday: str, now: str) -> str:
+def _build_system_prompt(prompt_body: str, today: str, cutoff: str, now: str) -> str:
     """Hängt verlässliche Datumsangaben an den Recherche-Prompt an."""
     return (
         f"{prompt_body}\n\n"
         "## Vom Wrapper bereitgestellte Datumsangaben (AUTORITATIV)\n"
         f"- HEUTE = {today}\n"
-        f"- GESTERN = {yesterday}\n"
+        f"- VOR_7_TAGEN = {cutoff} (= harter Cutoff: Artikel älter als dieses Datum AUSSCHLIESSEN)\n"
         f"- JETZT = {now} Europe/Berlin\n"
-        "Verwende diese Werte für Schritt 0 anstelle eigener Datumsermittlung."
+        "Verwende diese Werte für Schritt 0 anstelle eigener Datumsermittlung.\n"
+        "Hinweis: Ein nachgelagerter Wrapper filtert technisch noch einmal nach diesem "
+        "Cutoff — gib also IMMER `Datum: YYYY-MM-DD` pro News-Item aus, damit der "
+        "Filter die Items eindeutig zuordnen kann."
     )
 
 
@@ -108,6 +111,51 @@ def _clean_markdown(text: str) -> str:
     return text.strip()
 
 
+def _filter_by_date(text: str, cutoff: date, today: date) -> tuple[str, int]:
+    """Entfernt News-Items, deren Publikationsdatum vor `cutoff` liegt.
+
+    Geht über die Markdown-Abschnitte (getrennt durch `---`) und prüft pro Item
+    die in `Datum: YYYY-MM-DD` angegebene Veröffentlichung. Items in der
+    Zukunft (> today + 1 Tag) werden ebenfalls verworfen — fast immer
+    halluzinierte Daten.
+
+    Header- und Statistik-Abschnitte (kein "Datum:"-Marker) werden nie
+    angetastet, damit Stand/Zeitfenster/Stats erhalten bleiben.
+    """
+    import re
+
+    chunks = re.split(r"^---\s*$", text, flags=re.MULTILINE)
+    item_date_re = re.compile(
+        r"Datum[:\s]+\**\s*(\d{4})-(\d{2})-(\d{2})", flags=re.IGNORECASE
+    )
+    future_cutoff = today + timedelta(days=1)
+    kept: list[str] = []
+    removed = 0
+
+    for chunk in chunks:
+        match = item_date_re.search(chunk)
+        if not match:
+            # Kein Datums-Marker im Block (Header, Trenner, Statistik) → behalten.
+            kept.append(chunk)
+            continue
+        try:
+            item_date = date(int(match.group(1)), int(match.group(2)), int(match.group(3)))
+        except ValueError:
+            kept.append(chunk)
+            continue
+        if item_date < cutoff:
+            logger.info("Filter: Item mit Datum %s < cutoff %s entfernt.", item_date, cutoff)
+            removed += 1
+            continue
+        if item_date > future_cutoff:
+            logger.info("Filter: Item mit Zukunfts-Datum %s entfernt.", item_date)
+            removed += 1
+            continue
+        kept.append(chunk)
+
+    return "---".join(kept), removed
+
+
 def run_research() -> Path:
     """Führt die Recherche aus und speichert die Markdown-Datei. Gibt den Pfad zurück."""
     api_key = os.environ.get("ANTHROPIC_API_KEY")
@@ -115,12 +163,14 @@ def run_research() -> Path:
         raise RuntimeError("ANTHROPIC_API_KEY ist nicht gesetzt.")
 
     now_dt = _berlin_now()
-    today_iso = now_dt.strftime("%Y-%m-%d")
-    yesterday_iso = (now_dt - timedelta(days=1)).strftime("%Y-%m-%d")
+    today_date = now_dt.date()
+    cutoff_date = today_date - timedelta(days=7)
+    today_iso = today_date.strftime("%Y-%m-%d")
+    cutoff_iso = cutoff_date.strftime("%Y-%m-%d")
     now_str = now_dt.strftime("%Y-%m-%d %H:%M")
 
     prompt_body = PROMPT_FILE.read_text(encoding="utf-8")
-    system_prompt = _build_system_prompt(prompt_body, today_iso, yesterday_iso, now_str)
+    system_prompt = _build_system_prompt(prompt_body, today_iso, cutoff_iso, now_str)
 
     # Vergleichsbasis als Kontext anhängen.
     prev = _find_previous_markdown(today_iso)
@@ -218,6 +268,13 @@ def run_research() -> Path:
     markdown = _clean_markdown(markdown)
     if not markdown:
         raise RuntimeError("Antwort enthält nach Cleanup keinen Text — Datei wird NICHT geschrieben.")
+
+    markdown, removed_count = _filter_by_date(markdown, cutoff_date, today_date)
+    if removed_count:
+        logger.warning(
+            "Post-Filter hat %d Item(s) außerhalb des 7-Tage-Fensters entfernt.",
+            removed_count,
+        )
 
     MARKDOWN_DIR.mkdir(parents=True, exist_ok=True)
     out_path = MARKDOWN_DIR / f"sap_news_{today_iso}.md"
