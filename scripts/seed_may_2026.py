@@ -145,6 +145,43 @@ SEED_ITEMS: list[dict] = [
         "Ausweitung auf Kfz- und Gewerbesteuer geplant. Public-Sector-Referenz für integrierte Tax- "
         "und Revenue-Management-Lösungen.",
     ),
+
+    # === SD- / O2C-spezifische Themen ===
+    _item(
+        "Martur Fompak: Autonome Intralogistik mit Joule und Embodied AI",
+        "2026-05-20",
+        "https://news.sap.com/2026/05/martur-fompak-international-throughput-efficiency-intelligent-robotics-joule-embodied-ai/",
+        "Der Automotive-Zulieferer Martur Fompak verbindet SAP S/4HANA und SAP Extended Warehouse "
+        "Management (EWM) mit humanoiden Robotern: Produktionssignale werden in Echtzeit an autonome "
+        "Materialflüsse übergeben — Picking, Transport und Bestätigung zurück ins ERP. Konkretes "
+        "Beispiel, wie EWM-Daten Robotik kontextualisieren und O2C-/Fulfillment-Prozesse beschleunigen.",
+    ),
+    _item(
+        "SAP Business AI: Release Highlights Q1 2026",
+        "2026-04-23",
+        "https://news.sap.com/2026/04/sap-business-ai-release-highlights-q1-2026/",
+        "Quartalsupdate der SAP Business AI: u. a. AI-Email-to-Order in SAP Sales Cloud (E-Mails werden "
+        "automatisch in Aufträge inkl. SKU und Mengen umgewandelt), Predictive Close Dates, Deal Risk "
+        "Scoring und ein vereinheitlichter Agent Inbox. Direkter Praxiswert für O2C-Beratungsprojekte: "
+        "weniger manuelle Auftragserfassung, bessere Pipeline-Hygiene.",
+    ),
+    _item(
+        "SAP Sales Cloud V2 Q1 2026: Joule Studio GA + Deal Intelligence",
+        "2026-04-15",
+        "https://community.sap.com/t5/crm-and-cx-blog-posts-by-sap/sap-sales-cloud-q1-2026-innovation-overview/ba-p/14377174",
+        "Innovationsüberblick SAP Sales Cloud V2 für Q1 2026: Joule Studio ist GA, neue Deal-Intelligence-"
+        "Funktionen, vereinfachte Konfiguration. Für SD-Beratung interessant beim Übergang von "
+        "klassischem CRM zu Sales Cloud V2 und bei der Integration in S/4HANA-O2C-Prozesse.",
+        source="community.sap.com",
+    ),
+    _item(
+        "SAP Sapphire 2026: Building the Autonomous Supply Chain",
+        "2026-05-13",
+        "https://news.sap.com/2026/05/more-autonomous-supply-chain/",
+        "Vision einer autonomen Supply Chain mit agentenbasierter Orchestrierung über Planung, "
+        "Beschaffung, Produktion, Logistik und ATP hinweg. Relevant für SD/Logistik-Schnittstellen: "
+        "Available-to-Promise wird Bestandteil agentengetriebener Order-Fulfillment-Entscheidungen.",
+    ),
 ]
 
 
