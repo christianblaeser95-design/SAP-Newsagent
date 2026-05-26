@@ -108,16 +108,23 @@ def run_research() -> Path:
     logger.info("Starte Recherche mit Modell %s ...", MODEL)
 
     # Agentic loop: pause_turn behandeln, falls server-side Tools die interne Iteration ausschöpfen.
+    # web_search_20260209 / web_fetch_20260209 nutzen intern Code Execution für Dynamic Filtering;
+    # bei pause_turn muss die container_id aus der Antwort im Folge-Request mitgegeben werden.
     final_response = None
+    container_id: str | None = None
     for iteration in range(5):
+        request_kwargs = {
+            "model": MODEL,
+            "max_tokens": MAX_TOKENS,
+            "system": system_prompt,
+            "tools": tools,
+            "messages": messages,
+        }
+        if container_id is not None:
+            request_kwargs["container"] = container_id
+
         try:
-            with client.messages.stream(
-                model=MODEL,
-                max_tokens=MAX_TOKENS,
-                system=system_prompt,
-                tools=tools,
-                messages=messages,
-            ) as stream:
+            with client.messages.stream(**request_kwargs) as stream:
                 response = stream.get_final_message()
         except anthropic.APIError as exc:
             logger.error("Anthropic API-Fehler: %s", exc)
@@ -130,8 +137,12 @@ def run_research() -> Path:
             response.usage.output_tokens,
         )
 
+        # Container-ID für mögliche Folge-Iterationen merken.
+        if getattr(response, "container", None) is not None:
+            container_id = response.container.id
+
         if response.stop_reason == "pause_turn":
-            # Server pausiert — Antwort anhängen und nochmal aufrufen.
+            # Server pausiert — Antwort anhängen und mit container_id nochmal aufrufen.
             messages.append({"role": "assistant", "content": response.content})
             continue
 
