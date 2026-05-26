@@ -38,21 +38,39 @@ Verwende von hier an NUR noch diese drei Werte.
 - Notiere: "Vergleichsbasis: <gefundener_dateiname> (Inhalt übernommen, Datum ignoriert)"
 
 ## Schritt 2: Suche durchführen
-Führe MINDESTENS folgende 8 Suchen aus:
-1. `SAP S/4HANA release`
-2. `SAP Cloud ERP announcement`
-3. `SAP quarterly results`
-4. `SAP logistics SCM news`
-5. `SAP news today`
-6. `SAP press release`
-7. `SAP partnership announcement`
-8. `news.sap.com latest`
+Führe MINDESTENS folgende 8 Suchen aus — bewusst Mix aus SAP-eigenen und
+unabhängigen Quellen:
+
+1. `SAP S/4HANA release` (offen)
+2. `SAP Cloud ERP announcement` (offen)
+3. `SAP quarterly results` (Wirtschaftspresse erwartet)
+4. `SAP logistics SCM news` (offen)
+5. `news.sap.com latest` (SAP-eigene Pressestelle)
+6. `SAP analyst report site:erp.today OR site:sapinsider.org` (Fachpresse)
+7. `SAP migration challenges OR S/4HANA implementation problems` (kritische Sicht)
+8. `SAP Handelsblatt OR FAZ OR Bloomberg` (deutsche/internationale Wirtschaftspresse)
+
 Erwartete Rohtrefferzahl: 40–80 Treffer. Wenn weniger als 30, weitere Suchen
-(`SAP BTP`, `SAP Joule AI`, `SAP Datasphere`).
+(`SAP BTP`, `SAP Joule AI`, `SAP Datasphere`, `SAP customer story heise OR golem`).
 
 ## Schritt 3: Roh-Inventur
 Erstelle eine interne Tabelle ALLER gefundenen Treffer mit Titel, URL, Datum (falls genannt),
 Quelle (Domain). Zähle: Anzahl Roh-Treffer = N.
+
+## Schritt 3b: Quellen-Mix (PFLICHT)
+
+In der finalen Ausgabe MÜSSEN unterschiedliche Quellen vertreten sein.
+Harte Regel: **höchstens 50 % der Items dürfen von `news.sap.com` oder
+`sap.com` stammen.** Suche aktiv unabhängige Drittquellen:
+
+- ERP-Fachpresse: `erp.today`, `sapinsider.org`, `sapusers.org`, `computerweekly.com`
+- Wirtschaftspresse: Handelsblatt, FAZ, Bloomberg, Reuters
+- Tech-Journalismus: `heise.de`, `golem.de`, `t3n.de`, `silicon.de`, `theregister.com`, `siliconangle.com`
+- Analystenhäuser: Gartner, Forrester, Constellation Research
+
+Falls das 50%-Limit nicht erreichbar ist (z. B. weil reine PR-Woche), lieber
+weniger Items ausgeben als überproportional viele SAP-eigene Quellen. Vermerk
+dazu in der Statistik am Ende: "Quellen-Mix: X SAP-eigene, Y unabhängige."
 
 ## Schritt 4: Themen-Filter
 Behalten:
