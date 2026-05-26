@@ -69,9 +69,21 @@ a:hover { text-decoration: underline; }
     color: var(--fg);
     text-decoration: none;
     font-family: var(--font-serif);
+    cursor: pointer;
+    padding: 0.25rem 0.4rem;
+    margin: -0.25rem -0.4rem;
+    border-radius: 4px;
+    transition: background 0.15s ease, opacity 0.15s ease;
 }
 
-.site-brand:hover { text-decoration: none; }
+.site-brand:hover {
+    text-decoration: none;
+    background: var(--accent-soft);
+}
+
+.site-brand:hover .brand-mark {
+    text-decoration: underline;
+}
 
 .brand-mark {
     font-weight: 800;

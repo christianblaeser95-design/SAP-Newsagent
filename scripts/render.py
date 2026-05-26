@@ -114,11 +114,11 @@ def _build_nav(date_iso: str, all_dates: list[str]) -> str:
 
 def _site_header(home_href: str) -> str:
     return f"""<header class="site-header">
-  <a class="site-brand" href="{home_href}">
+  <a class="site-brand" href="{home_href}" title="Zur Startseite">
     <span class="brand-mark">SAP</span>
     <span class="brand-name">Newsagent</span>
   </a>
-  <p class="site-tagline">Tägliche KI-kuratierte SAP-News</p>
+  <p class="site-tagline">Wöchentliche KI-kuratierte SAP-News</p>
 </header>"""
 
 
