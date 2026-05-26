@@ -66,12 +66,34 @@ Ausschließen:
 - ältere News, die nur neu indexiert wurden
 - Treffer ohne verifizierbares Datum innerhalb der letzten 7 Tage
 
-## Schritt 5: Validierung (PFLICHT)
+## Schritt 5: Validierung — DATUM IST K.O.-KRITERIUM
+
 Für JEDEN verbleibenden Treffer:
 1. URL per web_fetch aufrufen.
-2. Datum verifizieren (letzte 7 Tage, Referenz JETZT).
+2. **DATUMS-PRÜFUNG (zuerst, hart):**
+   - Lies das Publikationsdatum vom Artikel.
+   - **Vergleich:** Publikationsdatum ≥ VOR_7_TAGEN ?
+   - **Wenn JA:** behalten.
+   - **Wenn NEIN oder Datum nicht eindeutig erkennbar:** SOFORT ausschließen, KEINE Diskussion.
+   - Beispiel mit VOR_7_TAGEN = 2026-05-19:
+     - Artikel vom 2026-05-23 → behalten (23 ≥ 19)
+     - Artikel vom 2026-05-19 → behalten (Grenztag, 19 ≥ 19)
+     - Artikel vom 2026-05-18 → ausschließen (18 < 19)
+     - Artikel vom 2026-05-12 → ausschließen
+     - Artikel vom 2026-03-15 → ausschließen
 3. Titel und Inhalt verifizieren.
 4. Bei Abweichung → ausschließen.
+
+NIEMALS einen Treffer behalten, nur weil er "interessant" oder "wichtig" ist.
+Wenn das Datum älter als VOR_7_TAGEN ist → raus.
+
+## Schritt 5b: ABSCHLUSSPRÜFUNG (vor Ausgabe)
+
+Bevor du Schritt 7 ausführst, gehe deine finale Liste DURCH und prüfe für JEDES Item:
+- Ist das Datum ≥ VOR_7_TAGEN? Wenn nicht: streichen.
+
+Diese Prüfung ist nicht optional. Lieber eine kurze Ausgabe ("Du bist auf dem
+aktuellen Stand.") als eine lange Ausgabe mit veralteten Treffern.
 
 ## Schritt 6: Deduplizierung
 Duplikat, wenn EINES zutrifft:
