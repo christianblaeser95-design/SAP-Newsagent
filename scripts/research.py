@@ -16,6 +16,7 @@ import logging
 import os
 import re
 import sys
+import time
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -40,15 +41,24 @@ CURATE_PROMPT_FILE = ROOT / "prompts" / "curate_prompt.md"
 MODEL = "claude-haiku-4-5"
 COLLECT_MAX_TOKENS = 8000
 CURATE_MAX_TOKENS = 4000
-# Tool-Budget für die Sammel-Stufe. 12 web_search + 12 web_fetch reicht für
-# die 16 Pflicht-Suchen aus dem Prompt (das Modell darf priorisieren).
-MAX_TOOL_USES = 12
+# Tool-Budget für die Sammel-Stufe. Getrennt pro Tool:
+# - web_search: 25, deckt die 22 Pflicht-Suchen (Teil A+B+C) mit Puffer ab.
+# - web_fetch: 12, hält die Input-Token-Kosten klein (jeder Fetch bringt
+#   schnell 10–30k Tokens des Artikelinhalts in den Kontext).
+MAX_WEB_SEARCH_USES = 25
+MAX_WEB_FETCH_USES = 12
 # Maximale Anzahl Items, die als Dedup-Basis an die Kurations-Stufe gehen
 # (neueste zuerst).
 DEDUP_CONTEXT_LIMIT = 40
 # Harter Cap auf Roh-Items, die an Stage 2 weitergereicht werden — schützt
 # Stage-2-Input-Kosten, falls der Sammel-Agent das Prompt-Limit ignoriert.
 MAX_RAW_ITEMS = 100
+
+# Pause zwischen Stage 1 und Stage 2 in Sekunden. Stage 1 verbraucht typisch
+# 200–300k Input-Tokens (web_fetch zählt voll), Tier-1-Limit ist 50k/min.
+# Ohne Pause schlägt Stage 2 mit HTTP 429 fehl. 90s gibt dem Token-Bucket
+# Zeit, sich für den kleinen Curate-Call (~10k Tokens) zu erholen.
+INTER_STAGE_SLEEP_SECONDS = 90
 
 # Hartes Kosten-Budget pro Pipeline-Lauf (USD). Bei Überschreitung wird der
 # Lauf abgebrochen statt weiterzulaufen. Haiku 4.5: $1/MTok input, $5/MTok output.
@@ -282,11 +292,11 @@ def _call_collect(
     tools = [
         {
             "type": "web_search_20260209", "name": "web_search",
-            "max_uses": MAX_TOOL_USES, "allowed_callers": ["direct"],
+            "max_uses": MAX_WEB_SEARCH_USES, "allowed_callers": ["direct"],
         },
         {
             "type": "web_fetch_20260209", "name": "web_fetch",
-            "max_uses": MAX_TOOL_USES, "allowed_callers": ["direct"],
+            "max_uses": MAX_WEB_FETCH_USES, "allowed_callers": ["direct"],
         },
     ]
     messages = [{"role": "user", "content": user_message}]
@@ -422,10 +432,20 @@ def run_research() -> int:
             f"Nach Sammel-Stufe kein Budget mehr übrig (verbraucht ${collect_cost:.4f} / ${BUDGET_USD:.2f})."
         )
     logger.info(
+        "Pause %ds vor Stage 2 (Rate-Limit-Recovery)…",
+        INTER_STAGE_SLEEP_SECONDS,
+    )
+    time.sleep(INTER_STAGE_SLEEP_SECONDS)
+
+    logger.info(
         "Stage 2: Kuratieren (Modell %s, ohne Tools, Restbudget $%.4f)…",
         MODEL, budget_remaining,
     )
     try:
+        curated_raw, curate_cost = _call_curate(client, curate_system, curate_user)
+    except anthropic.RateLimitError as exc:
+        logger.warning("Stage 2 trotz Pause rate-limited, warte 120s und versuche es nochmal: %s", exc)
+        time.sleep(120)
         curated_raw, curate_cost = _call_curate(client, curate_system, curate_user)
     except anthropic.APIError as exc:
         logger.error("Kurations-Stufe API-Fehler: %s", exc)

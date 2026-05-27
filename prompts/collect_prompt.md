@@ -48,21 +48,51 @@ dieses Prompts. Niemals selbst raten.
 15. `SAP site:heise.de`
 16. `SAP site:handelsblatt.com`
 
+**Teil C — 6 Modul-/Themen-Suchen (PFLICHT, immer ausführen):**
+17. `SAP SD Sales and Distribution`
+18. `SAP TM Transportation Management`
+19. `SAP EAM Enterprise Asset Management`
+20. `SAP BTP`
+21. `SAP Joule AI`
+22. `SAP Datasphere`
+
 **Treffer-Zielkorridor:**
-- Erwartete Rohtrefferzahl: **40–80 Items**.
-- Wenn nach Teil A + B weniger als **30 Treffer** vorliegen: zusätzliche
-  Suchen mit Synonymen nachschieben (`SAP BTP`, `SAP Joule AI`,
-  `SAP Datasphere`, `SAP SuccessFactors`, `SAP Ariba`).
+- Erwartete Rohtrefferzahl nach Teil A + B + C: **40–80 Items**.
 - **Maximal 100 Items** an die nächste Stufe weiterleiten. Wenn mehr
   qualifizieren: nur die ersten 100 ausgeben (Reihenfolge der Funde reicht —
   Ranking macht Stage 2).
 
 ## Schritt 2: Validierung (Datum ist K.O.)
-Für jeden vielversprechenden Treffer:
+
+**Datum heißt: das Publikations-/Veröffentlichungsdatum des Artikels.**
+NICHT: „Last updated", „Modified", „Reviewed on", Copyright-Jahr im Footer,
+Breadcrumb-Datum, Kommentar-Datum, oder das Datum eines verlinkten Folge-
+artikels. Wenn nur ein Update-Datum sichtbar ist und kein Original-Publikations-
+datum → behandeln wie „unklar" → verwerfen.
+
+**Vor-Filter aus Suchergebnissen (spart Fetches):**
+Google/Bing-Suchergebnisse zeigen in der Regel das Publikationsdatum im
+Snippet (z. B. „2 days ago", „May 23, 2026"). Wenn das Snippet-Datum klar
+**vor VOR_7_TAGEN** liegt: **gar nicht erst fetchen**, direkt verwerfen.
+
+**Beim Fetch (für die übrigen):**
 1. URL per `web_fetch` aufrufen.
-2. **Datums-Check zuerst:** Publikationsdatum ≥ VOR_7_TAGEN UND ≤ HEUTE?
-   Wenn nein oder unklar → SOFORT verwerfen, nicht ausgeben.
-3. Inhalt nur soweit lesen, dass du 2–3 Sätze beschreiben kannst.
+2. **Publikationsdatum prüfen:** ≥ VOR_7_TAGEN UND ≤ HEUTE?
+   - Quellen für das Datum (in dieser Reihenfolge): `<meta property="article:published_time">`,
+     `datePublished` im JSON-LD-Schema, sichtbares „Published"-/„Veröffentlicht"-Feld
+     direkt unter dem Titel.
+   - Bei Konflikt zwischen mehreren Datumsangaben immer das **früheste**
+     verwenden (= das Original-Publikationsdatum).
+   - Wenn Datum nicht eindeutig bestimmbar → verwerfen.
+3. Wenn Datum gültig: Inhalt soweit lesen, dass du 2–3 Sätze beschreiben kannst.
+
+**Beispiel mit VOR_7_TAGEN = 2026-05-20:**
+- Snippet „May 24, 2026" → fetchen, prüfen
+- Snippet „2 days ago" am 2026-05-27 → fetchen, prüfen
+- Snippet „May 12, 2026" → **nicht fetchen**, verwerfen
+- Artikel mit „Published: May 23, 2026" und „Updated: May 26, 2026"
+  → Published zählt, → behalten
+- Artikel nur mit „Last modified: May 25, 2026" ohne Published-Datum → verwerfen
 
 ## Schritt 3: Quellen-Vorfilter
 - **Behalten:** SAP offiziell (`news.sap.com`, `blogs.sap.com`,
@@ -73,7 +103,7 @@ Für jeden vielversprechenden Treffer:
 
 ## Was du NICHT machst
 - Keine Auswahl der „besten" Items — gib alles aus, was den Datums- und
-  Quellen-Vorfilter passiert (Ziel: 15–30 Items).
+  Quellen-Vorfilter passiert (Zielkorridor 40–80, max 100).
 - Keine Dedup-Prüfung gegen frühere Wochen — das macht die Kurations-Stufe.
 - Keine Übersetzung, keine Beratersicht, kein „Relevanz für SAP-Beratung"-Satz.
 - Keine Fließtext-Antwort, kein „Hier sind die Ergebnisse:". Nur die Blöcke.
