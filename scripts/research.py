@@ -1,4 +1,15 @@
-"""Wöchentlicher Recherche-Lauf: Anthropic API → strukturierte Items → JSONL-DB."""
+"""Zweistufige Recherche-Pipeline:
+
+1. **Sammel-Stufe** (Tools an): Haiku mit web_search + web_fetch sammelt
+   möglichst viele Roh-Items im 7-Tage-Fenster und gibt sie als kompakte,
+   parsbare Blöcke aus. Kein Ranking, keine Beratersicht.
+2. **Kurations-Stufe** (Tools aus): Haiku ohne Tools wählt aus der Rohliste
+   die 5–7 relevantesten Items, dedupliziert gegen die DB und schreibt das
+   finale Markdown mit Relevanz-Sätzen.
+
+Die Trennung spart Kosten (Tool-freier Curate-Call ist günstig) und verbessert
+die Auswahl-Qualität (eigener Pass nur für Ranking/Dedup).
+"""
 from __future__ import annotations
 
 import logging
@@ -23,16 +34,41 @@ from parse import (
 logger = logging.getLogger(__name__)
 
 ROOT = Path(__file__).resolve().parent.parent
-PROMPT_FILE = ROOT / "prompts" / "research_prompt.md"
+COLLECT_PROMPT_FILE = ROOT / "prompts" / "collect_prompt.md"
+CURATE_PROMPT_FILE = ROOT / "prompts" / "curate_prompt.md"
 
 MODEL = "claude-haiku-4-5"
-MAX_TOKENS = 8000
-# 12 erlaubt 16 Suchen ist nicht möglich — Anthropic teilt max_uses pro Tool.
-# 12 web_search + 12 web_fetch reicht für die 16 Pflicht-Suchen aus dem Prompt
-# (das Modell darf priorisieren). Budget pro Lauf: ~$0.25 = ~$1/Monat.
+COLLECT_MAX_TOKENS = 8000
+CURATE_MAX_TOKENS = 4000
+# Tool-Budget für die Sammel-Stufe. 12 web_search + 12 web_fetch reicht für
+# die 16 Pflicht-Suchen aus dem Prompt (das Modell darf priorisieren).
 MAX_TOOL_USES = 12
-# Maximale Anzahl Items, die als Dedup-Basis ans Modell gehen (neueste zuerst).
+# Maximale Anzahl Items, die als Dedup-Basis an die Kurations-Stufe gehen
+# (neueste zuerst).
 DEDUP_CONTEXT_LIMIT = 40
+# Harter Cap auf Roh-Items, die an Stage 2 weitergereicht werden — schützt
+# Stage-2-Input-Kosten, falls der Sammel-Agent das Prompt-Limit ignoriert.
+MAX_RAW_ITEMS = 100
+
+# Hartes Kosten-Budget pro Pipeline-Lauf (USD). Bei Überschreitung wird der
+# Lauf abgebrochen statt weiterzulaufen. Haiku 4.5: $1/MTok input, $5/MTok output.
+# Achtung: web_search ($10/1000 Suchen) und web_fetch (Input-Tokens) sind im
+# Modell-Usage enthalten bzw. wird die Such-Komponente nicht separat gezählt —
+# Schätzung ist konservativ für Tokens, eventuelle Such-Gebühren obendrauf.
+BUDGET_USD = 2.00
+HAIKU_INPUT_USD_PER_MTOK = 1.0
+HAIKU_OUTPUT_USD_PER_MTOK = 5.0
+
+
+class BudgetExceededError(RuntimeError):
+    """Wird ausgelöst, wenn das Pipeline-Budget überschritten wird."""
+
+
+def _estimate_cost(input_tokens: int, output_tokens: int) -> float:
+    return (
+        (input_tokens / 1_000_000) * HAIKU_INPUT_USD_PER_MTOK
+        + (output_tokens / 1_000_000) * HAIKU_OUTPUT_USD_PER_MTOK
+    )
 
 
 def _berlin_now() -> datetime:
@@ -56,15 +92,23 @@ def _build_dedup_context(items: list[dict], limit: int = DEDUP_CONTEXT_LIMIT) ->
     )
 
 
-def _build_system_prompt(prompt_body: str, today: str, cutoff: str, now: str) -> str:
+def _build_collect_system(prompt_body: str, today: str, cutoff: str, now: str) -> str:
     return (
         f"{prompt_body}\n\n"
         "## Vom Wrapper bereitgestellte Datumsangaben (AUTORITATIV)\n"
         f"- HEUTE = {today}\n"
-        f"- VOR_7_TAGEN = {cutoff} (harter Cutoff — Artikel davor AUSSCHLIESSEN)\n"
-        f"- JETZT = {now} Europe/Berlin\n\n"
-        "Pro Item IMMER `Datum: YYYY-MM-DD` ausgeben — ein nachgelagerter Filter "
-        "wirft alles raus, was vor VOR_7_TAGEN liegt."
+        f"- VOR_7_TAGEN = {cutoff} (harter Cutoff)\n"
+        f"- JETZT = {now} Europe/Berlin\n"
+    )
+
+
+def _build_curate_system(prompt_body: str, today: str, cutoff: str, now: str) -> str:
+    return (
+        f"{prompt_body}\n\n"
+        "## Vom Wrapper bereitgestellte Datumsangaben (AUTORITATIV)\n"
+        f"- HEUTE = {today}\n"
+        f"- VOR_7_TAGEN = {cutoff}\n"
+        f"- JETZT = {now} Europe/Berlin\n"
     )
 
 
@@ -102,12 +146,47 @@ def _clean_markdown(text: str) -> str:
     return bare_url_re.sub(_to_link, text).strip()
 
 
-def _filter_by_date(text: str, cutoff: date, today: date) -> tuple[str, int]:
-    """Entfernt Item-Blöcke außerhalb des 7-Tage-Fensters.
+def _filter_raw_by_date(raw_text: str, cutoff: date, today: date) -> tuple[str, int]:
+    """Filtert Sammel-Stufe-Output: behält nur `## TITEL`-Blöcke mit Datum im Fenster.
 
-    Splittet anhand der Titel-Pattern und schließt Items aus, deren `Datum:`
-    vor `cutoff` oder mehr als 1 Tag in der Zukunft liegt.
+    Erwartet das Roh-Format aus `collect_prompt.md`: Blöcke beginnen mit
+    `## TITEL`, enthalten eine `Datum: YYYY-MM-DD`-Zeile, sind durch `---`
+    getrennt.
     """
+    future_cutoff = today + timedelta(days=1)
+    blocks = re.split(r"\n---\s*\n", raw_text.strip())
+    kept: list[str] = []
+    removed = 0
+    for block in blocks:
+        block = block.strip()
+        if not block:
+            continue
+        m = DATE_LABEL_RE.search(block)
+        if not m:
+            removed += 1
+            continue
+        try:
+            item_date = date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+        except ValueError:
+            removed += 1
+            continue
+        if item_date < cutoff or item_date > future_cutoff:
+            logger.info("Sammel-Filter: Item mit Datum %s entfernt.", item_date)
+            removed += 1
+            continue
+        kept.append(block)
+    return "\n\n---\n\n".join(kept), removed
+
+
+def _count_raw_items(raw_text: str) -> int:
+    return sum(
+        1 for block in re.split(r"\n---\s*\n", raw_text.strip())
+        if block.strip() and DATE_LABEL_RE.search(block)
+    )
+
+
+def _filter_by_date(text: str, cutoff: date, today: date) -> tuple[str, int]:
+    """Entfernt finale Item-Blöcke außerhalb des 7-Tage-Fensters (Sicherheitsnetz)."""
     future_cutoff = today + timedelta(days=1)
 
     def is_item_title(line: str) -> bool:
@@ -167,7 +246,7 @@ def _filter_by_date(text: str, cutoff: date, today: date) -> tuple[str, int]:
             out_frames.append((kind, lines))
             continue
         if item_date < cutoff or item_date > future_cutoff:
-            logger.info("Filter: Item mit Datum %s entfernt (Cutoff %s).", item_date, cutoff)
+            logger.info("Curate-Filter: Item mit Datum %s entfernt (Cutoff %s).", item_date, cutoff)
             removed += 1
             continue
         out_frames.append((kind, lines))
@@ -178,8 +257,28 @@ def _filter_by_date(text: str, cutoff: date, today: date) -> tuple[str, int]:
     return "\n".join(result_lines), removed
 
 
-def _call_api(client: anthropic.Anthropic, system_prompt: str, user_message: str) -> anthropic.types.Message:
-    """API-Aufruf mit pause_turn-Handling für interne Code-Execution-Iteration."""
+def _log_usage(stage: str, response: anthropic.types.Message) -> float:
+    """Loggt Token-Verbrauch und grobe Kostenschätzung pro Stage. Gibt Kosten zurück."""
+    u = response.usage
+    cost = _estimate_cost(u.input_tokens, u.output_tokens)
+    logger.info(
+        "[%s] usage: input=%d, output=%d, ~$%.4f",
+        stage, u.input_tokens, u.output_tokens, cost,
+    )
+    return cost
+
+
+def _call_collect(
+    client: anthropic.Anthropic,
+    system_prompt: str,
+    user_message: str,
+    budget_remaining_usd: float,
+) -> tuple[str, float]:
+    """Sammel-Stufe mit web_search + web_fetch.
+
+    Bricht ab, sobald der laufende Stage-Verbrauch `budget_remaining_usd`
+    überschreitet. Gibt (Roh-Markdown, verbrauchte_kosten_usd) zurück.
+    """
     tools = [
         {
             "type": "web_search_20260209", "name": "web_search",
@@ -192,10 +291,12 @@ def _call_api(client: anthropic.Anthropic, system_prompt: str, user_message: str
     ]
     messages = [{"role": "user", "content": user_message}]
     container_id: str | None = None
+    total_input = 0
+    total_output = 0
 
     for iteration in range(5):
         kwargs = {
-            "model": MODEL, "max_tokens": MAX_TOKENS,
+            "model": MODEL, "max_tokens": COLLECT_MAX_TOKENS,
             "system": system_prompt, "tools": tools, "messages": messages,
         }
         if container_id is not None:
@@ -204,23 +305,60 @@ def _call_api(client: anthropic.Anthropic, system_prompt: str, user_message: str
         with client.messages.stream(**kwargs) as stream:
             response = stream.get_final_message()
 
+        total_input += response.usage.input_tokens
+        total_output += response.usage.output_tokens
+        running_cost = _estimate_cost(total_input, total_output)
         logger.info(
-            "API-Iteration %d: stop=%s, output_tokens=%d",
+            "[collect] iter %d: stop=%s, output_tokens=%d, kumuliert ~$%.4f / $%.2f",
             iteration + 1, response.stop_reason, response.usage.output_tokens,
+            running_cost, budget_remaining_usd,
         )
         if getattr(response, "container", None) is not None:
             container_id = response.container.id
 
+        if running_cost > budget_remaining_usd:
+            raise BudgetExceededError(
+                f"Sammel-Stufe: kumulierte Kosten ~${running_cost:.4f} "
+                f"überschreiten verfügbares Budget ${budget_remaining_usd:.2f} "
+                f"nach Iteration {iteration + 1}."
+            )
+
         if response.stop_reason == "pause_turn":
             messages.append({"role": "assistant", "content": response.content})
             continue
-        return response
 
-    raise RuntimeError("API endete nicht in einem terminalen Zustand nach 5 Iterationen.")
+        if response.stop_reason == "refusal":
+            raise RuntimeError(f"Sammel-Stufe abgelehnt: {getattr(response, 'stop_details', None)}")
+
+        logger.info(
+            "[collect] gesamt: input=%d, output=%d, ~$%.4f",
+            total_input, total_output, running_cost,
+        )
+        return _extract_text(response.content), running_cost
+
+    raise RuntimeError("Sammel-Stufe endete nicht in einem terminalen Zustand nach 5 Iterationen.")
+
+
+def _call_curate(
+    client: anthropic.Anthropic,
+    system_prompt: str,
+    user_message: str,
+) -> tuple[str, float]:
+    """Kurations-Stufe ohne Tools — billig, weil kein web_fetch."""
+    response = client.messages.create(
+        model=MODEL,
+        max_tokens=CURATE_MAX_TOKENS,
+        system=system_prompt,
+        messages=[{"role": "user", "content": user_message}],
+    )
+    cost = _log_usage("curate", response)
+    if response.stop_reason == "refusal":
+        raise RuntimeError(f"Kurations-Stufe abgelehnt: {getattr(response, 'stop_details', None)}")
+    return _extract_text(response.content), cost
 
 
 def run_research() -> int:
-    """Führt die Recherche aus, parsed Items und ergänzt die JSONL-DB. Gibt Anzahl neuer Items zurück."""
+    """Zweistufige Recherche → JSONL-DB. Gibt Anzahl neuer Items zurück."""
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     if not api_key:
         raise RuntimeError("ANTHROPIC_API_KEY ist nicht gesetzt.")
@@ -231,44 +369,93 @@ def run_research() -> int:
     today_iso, cutoff_iso = today_date.isoformat(), cutoff_date.isoformat()
     now_str = now_dt.strftime("%Y-%m-%d %H:%M")
 
-    # Dedup-Kontext aus JSONL — umfasst alle bisherigen Items.
     db_items = list(load_items().values())
     dedup_context = _build_dedup_context(db_items)
 
-    prompt_body = PROMPT_FILE.read_text(encoding="utf-8")
-    system_prompt = _build_system_prompt(prompt_body, today_iso, cutoff_iso, now_str)
-    user_message = (
-        f"Bitte führe die wöchentliche SAP-News-Recherche für {today_iso} (Europe/Berlin) aus.\n"
-        f"Folge dem System-Prompt strikt. Gib am Ende NUR das fertige Markdown aus.\n\n"
-        f"{dedup_context}"
-    )
-
-    logger.info("Starte Recherche (Modell %s, %d Items in DB)…", MODEL, len(db_items))
     client = anthropic.Anthropic(api_key=api_key)
+
+    # ----- Stage 1: Sammeln -----
+    collect_body = COLLECT_PROMPT_FILE.read_text(encoding="utf-8")
+    collect_system = _build_collect_system(collect_body, today_iso, cutoff_iso, now_str)
+    collect_user = (
+        f"Sammle SAP-News-Roh-Items für {today_iso} (Europe/Berlin). "
+        f"Folge dem System-Prompt strikt. Gib NUR die Item-Blöcke aus."
+    )
+    logger.info("Stage 1: Sammeln (Modell %s, Budget $%.2f)…", MODEL, BUDGET_USD)
+    raw_output, collect_cost = _call_collect(
+        client, collect_system, collect_user, budget_remaining_usd=BUDGET_USD,
+    )
+    if not raw_output:
+        raise RuntimeError("Sammel-Stufe lieferte leere Antwort.")
+
+    raw_filtered, raw_removed = _filter_raw_by_date(raw_output, cutoff_date, today_date)
+    raw_count = _count_raw_items(raw_filtered)
+    logger.info(
+        "Sammel-Stufe: %d Roh-Items (Datums-Filter entfernte %d).",
+        raw_count, raw_removed,
+    )
+    if raw_count > MAX_RAW_ITEMS:
+        blocks = re.split(r"\n---\s*\n", raw_filtered.strip())
+        kept = [b for b in blocks if b.strip() and DATE_LABEL_RE.search(b)][:MAX_RAW_ITEMS]
+        raw_filtered = "\n\n---\n\n".join(kept)
+        logger.warning(
+            "Sammel-Stufe lieferte %d Items, kappe auf MAX_RAW_ITEMS=%d.",
+            raw_count, MAX_RAW_ITEMS,
+        )
+        raw_count = MAX_RAW_ITEMS
+    if raw_count == 0:
+        logger.warning("Keine Roh-Items übrig — überspringe Kuration.")
+        return 0
+
+    # ----- Stage 2: Kuratieren -----
+    curate_body = CURATE_PROMPT_FILE.read_text(encoding="utf-8")
+    curate_system = _build_curate_system(curate_body, today_iso, cutoff_iso, now_str)
+    curate_user = (
+        f"Kuratiere die folgende Rohliste für {today_iso} (Europe/Berlin). "
+        f"Folge dem System-Prompt strikt. Gib NUR das fertige Markdown aus.\n\n"
+        f"{dedup_context}\n\n"
+        f"ROHLISTE ({raw_count} Items vom Sammel-Agent):\n\n{raw_filtered}"
+    )
+    budget_remaining = BUDGET_USD - collect_cost
+    if budget_remaining <= 0:
+        raise BudgetExceededError(
+            f"Nach Sammel-Stufe kein Budget mehr übrig (verbraucht ${collect_cost:.4f} / ${BUDGET_USD:.2f})."
+        )
+    logger.info(
+        "Stage 2: Kuratieren (Modell %s, ohne Tools, Restbudget $%.4f)…",
+        MODEL, budget_remaining,
+    )
     try:
-        response = _call_api(client, system_prompt, user_message)
+        curated_raw, curate_cost = _call_curate(client, curate_system, curate_user)
     except anthropic.APIError as exc:
-        logger.error("Anthropic API-Fehler: %s", exc)
+        logger.error("Kurations-Stufe API-Fehler: %s", exc)
         raise
+    total_cost = collect_cost + curate_cost
+    logger.info(
+        "Pipeline-Kosten: collect ~$%.4f + curate ~$%.4f = ~$%.4f / Budget $%.2f",
+        collect_cost, curate_cost, total_cost, BUDGET_USD,
+    )
+    if total_cost > BUDGET_USD:
+        logger.warning(
+            "Gesamtkosten ~$%.4f überschreiten Budget $%.2f (Kuration lief trotzdem durch).",
+            total_cost, BUDGET_USD,
+        )
 
-    if response.stop_reason == "refusal":
-        raise RuntimeError(f"Modell hat abgelehnt: {getattr(response, 'stop_details', None)}")
-
-    markdown = _clean_markdown(_extract_text(response.content))
+    markdown = _clean_markdown(curated_raw)
     if not markdown:
-        raise RuntimeError("Leere Antwort — kein Update der DB.")
+        raise RuntimeError("Kurations-Stufe lieferte leere Antwort.")
 
     markdown, removed = _filter_by_date(markdown, cutoff_date, today_date)
     if removed:
-        logger.warning("Datums-Filter hat %d Item(s) entfernt.", removed)
+        logger.warning("Curate-Datums-Filter hat %d Item(s) entfernt.", removed)
 
-    # Parse + Upsert in JSONL.
+    # ----- Persist -----
     new_items = parse_items(markdown, run_date=today_iso)
     db_map = {i["url"]: i for i in db_items}
     added, updated = upsert_items(db_map, new_items)
     save_items(db_map.values())
     logger.info(
-        "DB-Update: %d Items geparst, +%d neu, %d aktualisiert, gesamt %d.",
+        "DB-Update: %d kuratierte Items, +%d neu, %d aktualisiert, gesamt %d.",
         len(new_items), added, updated, len(db_map),
     )
     return added

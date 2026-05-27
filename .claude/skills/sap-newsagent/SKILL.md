@@ -14,13 +14,24 @@ Aufgaben durchführt.
 ```
 Workflow (Mo 06:00 UTC) ─► research.py
                               │
-                              ├─ Anthropic API mit web_search + web_fetch
-                              ├─ Markdown-Antwort cleanen + Datums-Filter
+                              ├─ Stage 1: Sammeln (Haiku + web_search/fetch)
+                              │     └─ collect_prompt.md → Roh-Items als ##-Blöcke
+                              │     └─ _filter_raw_by_date (Datums-K.O.)
+                              │
+                              ├─ Stage 2: Kuratieren (Haiku, ohne Tools)
+                              │     └─ curate_prompt.md → finales Markdown
+                              │           mit Ranking, Dedup, Relevanz-Sätzen
+                              │
+                              ├─ Markdown cleanen + Datums-Filter (Sicherheitsnetz)
                               ├─ parse_items() → strukturierte Items
                               └─ upsert in data/news.jsonl (URL-Dedup)
 
 render.py liest news.jsonl ─► für jeden Edition-Termin Items in [date-7d, date] ─► docs/archive/*.html + docs/index.html
 ```
+
+**Zweistufig aus Kostengründen:** Stage 1 nutzt teure Web-Tools nur zum
+Sammeln (knappe Outputs). Stage 2 ranked + formatiert ohne Tools (sehr billig).
+Token-Verbrauch + Kosten werden pro Stage geloggt (`[collect]` / `[curate]`).
 
 **Source of Truth: `data/news.jsonl`** — eine Zeile pro Item.
 HTML in `docs/` ist generierter Output. Es gibt **keine** Markdown-Audit-Dateien
@@ -101,24 +112,28 @@ Danach `python scripts/render.py`.
 
 ### Themen / Quellenpriorität ändern
 
-→ `prompts/research_prompt.md` editieren. Schritt 4 (Themen-Filter) und
-Schritt 3b (Quellenpriorität) sind die relevanten Abschnitte. Kein Code-Anfassen
-nötig.
+- **Such-Queries & Quellen-Vorfilter:** `prompts/collect_prompt.md`
+  (Schritt 1 = 16 Pflicht-Suchen, Schritt 3 = Quellen-Vorfilter).
+- **Themen-Ranking & Ziel-Quellenprio für die Endauswahl:**
+  `prompts/curate_prompt.md` (Schritt 1 = Quellenprio, Schritt 2 = Themen-Filter).
+- **Relevanz-Satz / finales Format:** `prompts/curate_prompt.md` (Schritt 4).
+
+Kein Code-Anfassen nötig.
 
 ### Modell wechseln
 
-→ `scripts/research.py` Konstante `MODEL` ändern. Wenn auf Sonnet 4.6 hoch:
-`allowed_callers=["direct"]` aus den Tools entfernen, damit Dynamic Filtering
-greift; `MAX_TOOL_USES` auf 25 und `MAX_TOKENS` auf 16000. Vorsicht: Anthropic
-Tier 1 erlaubt nur 30k Input-TPM bei Sonnet — eventuell Rate-Limit-Fehler bei
-hoher Tool-Nutzung.
+→ `scripts/research.py` Konstante `MODEL` ändern (gilt für beide Stages).
+Wenn auf Sonnet 4.6 hoch: `allowed_callers=["direct"]` aus den Tools in
+`_call_collect` entfernen, damit Dynamic Filtering greift; `MAX_TOOL_USES`
+auf 25 und `COLLECT_MAX_TOKENS` auf 16000. Vorsicht: Anthropic Tier 1 erlaubt
+nur 30k Input-TPM bei Sonnet — Rate-Limit-Fehler möglich.
 
 ### Zeitfenster ändern (aktuell 7 Tage)
 
-Zwei Stellen:
-1. `scripts/research.py` → `cutoff_date = today_date - timedelta(days=N)` und
-   `WINDOW_DAYS` (falls existent).
-2. `prompts/research_prompt.md` → alle Erwähnungen von "7 Tage" / "VOR_7_TAGEN" anpassen.
+Drei Stellen:
+1. `scripts/research.py` → `cutoff_date = today_date - timedelta(days=N)`.
+2. `prompts/collect_prompt.md` UND `prompts/curate_prompt.md` → alle
+   Erwähnungen von "7 Tage" / "VOR_7_TAGEN" anpassen.
 3. `scripts/render.py` → `WINDOW_DAYS` Konstante.
 
 ### Lokale Vorschau prüfen
@@ -154,11 +169,12 @@ Versehen entfernen.
 
 ### Datum-K.O.-Filter
 
-Doppelter Schutz:
-1. Prompt-Regel "Datum ≥ VOR_7_TAGEN sonst ausschließen" (Schritt 5).
-2. Programmatischer Filter `research._filter_by_date`. Funktioniert auch wenn
-   das Modell Items in einem Block ohne `---`-Trenner ausgibt — splittet nach
-   Titel-Pattern, prüft `Datum: YYYY-MM-DD` pro Item.
+Dreifacher Schutz:
+1. Prompt-Regel im Sammel-Prompt ("Datum ≥ VOR_7_TAGEN sonst verwerfen").
+2. `research._filter_raw_by_date` zwischen Stage 1 und Stage 2 — splittet
+   die Roh-Blöcke an `---` und prüft `Datum:` pro Block.
+3. `research._filter_by_date` nach Stage 2 als Sicherheitsnetz — splittet
+   das finale Markdown nach Titel-Pattern.
 
 ### Item-Zähler verzählt sich
 
@@ -188,12 +204,13 @@ Der Workflow committet automatisch. Vor dem manuellen Commit/Push immer
 | Pfad | Zweck |
 |---|---|
 | `scripts/main.py` | Orchestriert research → render → cleanup |
-| `scripts/research.py` | API-Call, Datums-Filter, JSONL-Append |
+| `scripts/research.py` | Zweistufige Pipeline (collect + curate), Datums-Filter, JSONL-Append |
 | `scripts/parse.py` | Markdown-Block → Item-Dict |
 | `scripts/database.py` | JSONL lesen/schreiben |
 | `scripts/render.py` | JSONL → HTML |
 | `scripts/cleanup.py` | Alte HTML-Archive löschen (>90 Tage) |
-| `prompts/research_prompt.md` | Recherche-Prompt (frei editierbar) |
+| `prompts/collect_prompt.md` | Sammel-Stage-Prompt (Suchen, Roh-Items) |
+| `prompts/curate_prompt.md` | Kurations-Stage-Prompt (Ranking, Dedup, finales Format) |
 | `data/news.jsonl` | Item-Datenbank |
 | `docs/index.html` | Startseite (generiert) |
 | `docs/archive/*.html` | Wochenausgaben (generiert) |
