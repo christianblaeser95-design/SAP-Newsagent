@@ -34,27 +34,35 @@ dieses Prompts. Niemals selbst raten.
 
 **Teil B — Pro Quelle eine `site:`-Suche:**
 
+*SAP offiziell:*
+9. `SAP site:news.sap.com`
+10. `SAP site:blogs.sap.com`
+
 *SAP-nahe Fachpresse:*
-9. `SAP site:sapinsider.org`
-10. `SAP site:erp.today`
-11. `SAP site:diginomica.com`
+11. `SAP site:sapinsider.org`
+12. `SAP site:erp.today`
+13. `SAP site:diginomica.com`
 
 *Enterprise-IT-Journalismus (nur SAP-spezifisch):*
-12. `SAP site:computerweekly.com`
-13. `SAP site:siliconangle.com`
-14. `SAP site:theregister.com`
+14. `SAP site:computerweekly.com`
+15. `SAP site:siliconangle.com`
+16. `SAP site:theregister.com`
+17. `SAP site:zdnet.com`
+18. `SAP site:cio.com`
 
 *Deutschsprachig (nur SAP-spezifisch):*
-15. `SAP site:heise.de`
-16. `SAP site:handelsblatt.com`
+19. `SAP site:heise.de`
+20. `SAP site:handelsblatt.com`
+21. `SAP site:computerwoche.de`
+22. `SAP site:it-daily.net`
 
 **Teil C — 6 Modul-/Themen-Suchen (PFLICHT, immer ausführen):**
-17. `SAP SD Sales and Distribution`
-18. `SAP TM Transportation Management`
-19. `SAP EAM Enterprise Asset Management`
-20. `SAP BTP`
-21. `SAP Joule AI`
-22. `SAP Datasphere`
+23. `SAP SD Sales and Distribution`
+24. `SAP TM Transportation Management`
+25. `SAP EAM Enterprise Asset Management`
+26. `SAP BTP`
+27. `SAP Joule AI`
+28. `SAP Datasphere`
 
 **Treffer-Zielkorridor:**
 - Erwartete Rohtrefferzahl nach Teil A + B + C: **40–80 Items**.

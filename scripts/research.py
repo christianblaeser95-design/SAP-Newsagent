@@ -42,11 +42,13 @@ MODEL = "claude-haiku-4-5"
 COLLECT_MAX_TOKENS = 8000
 CURATE_MAX_TOKENS = 4000
 # Tool-Budget für die Sammel-Stufe. Getrennt pro Tool:
-# - web_search: 25, deckt die 22 Pflicht-Suchen (Teil A+B+C) mit Puffer ab.
-# - web_fetch: 12, hält die Input-Token-Kosten klein (jeder Fetch bringt
-#   schnell 10–30k Tokens des Artikelinhalts in den Kontext).
-MAX_WEB_SEARCH_USES = 25
-MAX_WEB_FETCH_USES = 12
+# - web_search: 32, deckt die 28 Pflicht-Suchen (Teil A+B+C) mit Puffer ab.
+# - web_fetch: 8, hält Input-Tokens unter Haikus 200k-Kontext-Limit.
+#   Jeder Fetch bringt 10–30k Tokens Webseiten-Inhalt; bei 28+ Suchen
+#   (je ~3–5k Tokens) bleiben nach Fetches ~50–70k Puffer für System-
+#   Prompt + Modell-Output. Erhöhen erst, wenn Tier-2-Limits gekauft.
+MAX_WEB_SEARCH_USES = 32
+MAX_WEB_FETCH_USES = 8
 # Maximale Anzahl Items, die als Dedup-Basis an die Kurations-Stufe gehen
 # (neueste zuerst).
 DEDUP_CONTEXT_LIMIT = 40
@@ -56,9 +58,12 @@ MAX_RAW_ITEMS = 100
 
 # Pause zwischen Stage 1 und Stage 2 in Sekunden. Stage 1 verbraucht typisch
 # 200–300k Input-Tokens (web_fetch zählt voll), Tier-1-Limit ist 50k/min.
-# Ohne Pause schlägt Stage 2 mit HTTP 429 fehl. 90s gibt dem Token-Bucket
-# Zeit, sich für den kleinen Curate-Call (~10k Tokens) zu erholen.
-INTER_STAGE_SLEEP_SECONDS = 90
+# Ohne Pause schlägt Stage 2 mit HTTP 429 fehl. Testlauf 2026-05-27: 90s
+# reichten nicht, 120s-Fallback-Retry war nötig — daher direkt 150s als
+# Default. Bei Stage 1 mit ~230k Input dauert das Token-Bucket-Recovery
+# rechnerisch ~4.6min, aber Stage 2 braucht nur ~10k Tokens, daher genügen
+# ~2.5min Pause in der Praxis.
+INTER_STAGE_SLEEP_SECONDS = 150
 
 # Hartes Kosten-Budget pro Pipeline-Lauf (USD). Bei Überschreitung wird der
 # Lauf abgebrochen statt weiterzulaufen. Haiku 4.5: $1/MTok input, $5/MTok output.
